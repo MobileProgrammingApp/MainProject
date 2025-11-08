@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/navbars/chores.dart';
 import 'package:flutter_app/navbars/home.dart';
 import 'package:flutter_app/navbars/home_info_screen.dart';
-import 'package:flutter_app/navbars/settings.dart';
+import 'package:flutter_app/screens/settings_screen.dart';
 import 'package:flutter_app/navbars/shopping.dart';
 import 'app_theme.dart'; // Stil dosyamız
 

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../core/app_theme.dart'; // Senin stil dosyan
+import 'package:flutter_app/screens/notifications_screen.dart';
+import 'package:flutter_app/screens/profile_screen.dart';
+import 'package:flutter_app/screens/manageHome_screen.dart';
+import '../../core/app_theme.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -11,7 +14,6 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Ayarlar', style: AppStyles.appBarTitle),
         backgroundColor: AppStyles.backgroundColor,
-        elevation: 0,
         centerTitle: true,
       ),
       body: ListView(
@@ -19,35 +21,24 @@ class SettingsScreen extends StatelessWidget {
         children: [
           const SizedBox(height: 8),
 
-          // 🔹 Profil Ayarları
+          // 🔹 Profil 
           ListTile(
             leading: const Icon(Icons.person_outline, color: AppStyles.primaryColor),
             title: const Text('Profil', style: AppStyles.listTileTitle),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
             onTap: () {
-              // Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
             },
           ),
           const Divider(),
 
-          // 🔹 Evi Yönet (grup yönetimi)
+          // 🔹 Ev Yönetim
           ListTile(
             leading: const Icon(Icons.home_work_outlined, color: AppStyles.primaryColor),
             title: const Text('Evi Yönet', style: AppStyles.listTileTitle),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
             onTap: () {
-              // Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageHomeScreen()));
-            },
-          ),
-          const Divider(),
-
-          // 🔹 Tema veya Görünüm Ayarları (geleceğe hazırlık)
-          ListTile(
-            leading: const Icon(Icons.palette_outlined, color: AppStyles.primaryColor),
-            title: const Text('Tema', style: AppStyles.listTileTitle),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
-            onTap: () {
-              // Navigator.push(context, MaterialPageRoute(builder: (_) => const ThemeSettingsScreen()));
+             Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageHomeScreen()));
             },
           ),
           const Divider(),
@@ -58,7 +49,7 @@ class SettingsScreen extends StatelessWidget {
             title: const Text('Bildirimler', style: AppStyles.listTileTitle),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
             onTap: () {
-              // Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()));
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()));
             },
           ),
           const Divider(),
