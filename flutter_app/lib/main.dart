@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'core/app_scaffold.dart'; // Ana iskeletimizi import et
+import 'core/app_scaffold.dart';
+import 'core/app_theme.dart';
+import 'navbars/login_screen.dart'; // Bu importu eklediğinden emin ol
 
 void main() {
-  // TODO: Firebase.initializeApp() gibi kurulumlar buraya gelecek
   runApp(const MyApp());
 }
 
@@ -12,50 +13,19 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Evim Projesi',
+      title: 'Evim Uygulaması',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        // Temamızı yavaş yavaş buraya taşıyabiliriz
-        // Şimdilik en temeli:
-        primarySwatch: Colors.orange,
-        scaffoldBackgroundColor: const Color(0xFFFFFBF6), // Krem arka plan
-        fontFamily: 'Inter', // (Eğer 'pubspec.yaml'a eklerseniz)
+        useMaterial3: true,
+        primaryColor: AppStyles.primaryColor,
+        scaffoldBackgroundColor: AppStyles.backgroundColor,
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          elevation: 0,
+        ),
       ),
-      // Uygulamanın başladığı yer:
-      home: const AppScaffold(),
+      // DÜZELTME BURADA: Uygulama artık LoginScreen ile başlıyor
+      home: const LoginScreen(), 
     );
   }
 }
-
-
-
-// import 'package:flutter/material.dart';
-// import 'package:flutter_app/navbars/home_info_screen.dart';
-// // core klasöründeki ana iskeletimizi import ediyoruz
-// import 'core/app_scaffold.dart'; 
-
-// void main() {
-//   // TODO: Firebase kurulum kodları (initializeApp) buraya gelecek
-//   runApp(const MyApp());
-// }
-
-// class MyApp extends StatelessWidget {
-//   const MyApp({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       title: 'Ev Yönetim Uygulaması',
-//       theme: ThemeData(
-//         primarySwatch: Colors.blue,
-//       ),
-//       debugShowCheckedModeBanner: false,
-//       // BURASI ÇOK ÖNEMLİ:
-//       // 'home:' kısmının 'AppScaffold()' olduğundan emin ol.
-//       // Eğer burada 'MyHomePage()' gibi eski bir şey yazıyorsa,
-//       // eski projenin çalışması normaldir.
-//       //home: const X()
-//       home: const HomeInfoScreen(), 
-//     );
-//   }
-// }

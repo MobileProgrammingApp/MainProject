@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/navbars/chores.dart';
-import 'package:flutter_app/navbars/home.dart';
-import 'package:flutter_app/navbars/home_info_screen.dart';
-import 'package:flutter_app/navbars/settings.dart';
-import 'package:flutter_app/navbars/shopping.dart';
-import 'app_theme.dart'; // Stil dosyamız
+import '../navbars/home.dart';
+import '../navbars/chores.dart';
+import '../navbars/shopping.dart';
+import '../navbars/home_info_screen.dart';
+import '../screens/settings_screen.dart';
+import 'app_theme.dart';
 
 class AppScaffold extends StatefulWidget {
   const AppScaffold({super.key});
@@ -16,73 +16,67 @@ class AppScaffold extends StatefulWidget {
 class _AppScaffoldState extends State<AppScaffold> {
   int _selectedIndex = 0;
 
-  // 5 adet ekranımızı (sayfamızı) bir listeye koyuyoruz
-  static const List<Widget> _widgetOptions = <Widget>[
-    HomeScreen(),
-    HomeInfoScreen(), // Videodaki 'Finans' yerine sizin ekranınız
-    ShoppingScreen(),
-    ChoresScreen(),
-    SettingsScreen(),
-  ];
-
+  // ==========================================
+  // ⚙️ NAVİGASYON MANTIĞI (DOKUNMA)
+  // Burası sayfa geçişlerini yönetir. Backend değil ama
+  // burası bozulursa menü çalışmaz.
+  // ==========================================
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
+  // ==========================================
+  // 🏁 MANTIK BİTİŞ
+  // ==========================================
 
   @override
   Widget build(BuildContext context) {
+    // Sayfaları build içinde tanımlıyoruz ki navigasyon fonksiyonunu HomeScreen'e aktarabilelim
+    final List<Widget> _pages = [
+      HomeScreen(onTabChange: _onItemTapped), 
+      const ChoresScreen(),
+      const ShoppingScreen(),
+      const HomeInfoScreen(),
+      const SettingsScreen(),
+    ];
+
     return Scaffold(
-      // Not: Artık ekranların kendi AppBar'ı olduğu için
-      // burada genel bir AppBar'a ihtiyacımız yok.
-      // body: _widgetOptions.elementAt(_selectedIndex),
-      
-      // DÜZELTME: Ekranların kendi AppBar'ı olması (özellikle TabBar'lı
-      // HomeInfoScreen) kafa karıştırıcı olabilir.
-      // DAHA İYİ YÖNTEM: 'IndexedStack' kullanalım.
-      // Bu, 5 ekranı da hafızada tutar ve geçişleri hızlı yapar.
-      // 'AppBar'ı olmayan bir 'Scaffold' en temizidir.
-      
+      // 🎨 TASARIM KISMI - BURAYI DÜZENLEYEBİLİRSİN
       body: IndexedStack(
         index: _selectedIndex,
-        children: _widgetOptions,
+        children: _pages,
       ),
-      
       bottomNavigationBar: BottomNavigationBar(
-        // Bu ayarlar navbar'ın 'eski' görünmesini engeller
-        type: BottomNavigationBarType.fixed, 
-        backgroundColor: Colors.white,
-        
-        // Temamızı (Sıcak Turuncu) burada kullanalım
-        selectedItemColor: AppStyles.primaryColor,
-        unselectedItemColor: Colors.grey.shade500,
-        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-        
-        items: const <BottomNavigationBarItem>[
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: AppStyles.accentColor, // Seçili ikon rengi
+        unselectedItemColor: Colors.grey,         // Seçili olmayan ikon rengi
+        backgroundColor: Colors.white,            // Arka plan rengi
+        elevation: 8,
+        items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_filled),
-            label: 'Ana Sayfa',
+            icon: Icon(Icons.dashboard_rounded), 
+            label: 'Panel',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.info_rounded),
-            label: 'Ev Bilgileri', // Finans yerine
+            icon: Icon(Icons.assignment_turned_in_rounded), 
+            label: 'İşler',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart_rounded),
-            label: 'Alışveriş',
+            icon: Icon(Icons.shopping_basket_rounded), 
+            label: 'Market',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.task_alt_rounded),
-            label: 'Görevler',
+            icon: Icon(Icons.house_rounded), 
+            label: 'Ev Bilgi',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.settings_rounded),
+            icon: Icon(Icons.settings_rounded), 
             label: 'Ayarlar',
           ),
         ],
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
       ),
     );
   }
