@@ -84,6 +84,8 @@ class ApiService {
           "creator_id": creatorId.toString(),
           "assigned_to_id": assignedToId.toString(),
           "task_name": taskName,
+          "house_id": creatorId.toString(), // Creator ID house ID olarak kullanılıyor
+
         },
       );
       // --- DEBUG ---
@@ -101,15 +103,37 @@ class ApiService {
     }
   }
 
-  static Future<List<dynamic>> getChores() async {
+  static Future<List<dynamic>> getChores(int houseId) async {
     try {
-      final response = await http.get(Uri.parse("$baseUrl/get_chores.php"));
+      final response = await http.get(Uri.parse("$baseUrl/get_chores.php?house_id=$houseId"));
+      
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        // Gelen veriyi önce genel (dynamic) olarak alıyoruz
+        final dynamic decodedData = json.decode(response.body);
+
+        // KONTROL 1: Gelen veri bir Liste mi? (Başarılı durum)
+        if (decodedData is List) {
+          return decodedData;
+        } 
+        // KONTROL 2: Gelen veri bir Map mi? (Hata durumu veya Wrapped List olabilir)
+        else if (decodedData is Map) {
+          print("Sunucu Mesajı (getChores): ${decodedData['message']}");
+          
+          // EĞER "data" veya "chores" anahtarı altında liste varsa onu döndür
+          if (decodedData.containsKey('data') && decodedData['data'] is List) {
+             return decodedData['data'];
+          }
+          if (decodedData.containsKey('chores') && decodedData['chores'] is List) {
+             return decodedData['chores'];
+          }
+
+          return []; 
+        }
       }
     } catch (e) {
       print("API Hatası (getChores): $e");
     }
+    // Herhangi bir sorun olursa boş liste döndür, uygulama çökmesin
     return [];
   }
 
@@ -146,10 +170,15 @@ class ApiService {
       if (response.statusCode == 200) {
         final decodedData = json.decode(response.body);
 
-        // KONTROL: Gelen veri bir Liste mi?
         if (decodedData is List) {
           return decodedData;
-        } else {
+        } else if (decodedData is Map) {
+           if (decodedData.containsKey('data') && decodedData['data'] is List) {
+             return decodedData['data'];
+           }
+           if (decodedData.containsKey('members') && decodedData['members'] is List) {
+             return decodedData['members'];
+           }
           // Liste değilse (muhtemelen hata mesajı içeren bir Map'tir), boş liste dön
           print("Sunucudan liste gelmedi: $decodedData");
           return []; 

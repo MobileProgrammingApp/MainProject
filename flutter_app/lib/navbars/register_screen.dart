@@ -65,13 +65,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
          await prefs.setInt('saved_house_id', int.parse(result['user_id'].toString()));
       }
       
+      int newHouseId = int.parse(result['user_id'].toString());
+      
       // Ev ismini de kaydedelim ki hemen görünsün
       await prefs.setString('saved_house_name', _houseNameController.text);
       // ---------------------------------------------------------
       
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const AppScaffold()),
+        MaterialPageRoute(builder: (context) => AppScaffold(houseId: newHouseId)),
         (route) => false,
       );
       

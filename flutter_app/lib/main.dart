@@ -1,14 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Import eklendi
 import 'core/app_scaffold.dart';
 import 'core/app_theme.dart';
-import 'navbars/login_screen.dart'; // Bu importu eklediğinden emin ol
+import 'navbars/login_screen.dart'; 
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  // Flutter motorunu başlat (Async işlemler için gerekli)
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Hafızayı kontrol et
+  final prefs = await SharedPreferences.getInstance();
+  final int? savedHouseId = prefs.getInt('saved_house_id');
+  
+  // Eğer savedHouseId varsa (null değilse), kullanıcı giriş yapmış demektir.
+  // Bu durumda direkt AppScaffold (Ana Ekran) açılır.
+  // Yoksa LoginScreen (Giriş Ekranı) açılır.
+  Widget firstScreen = (savedHouseId != null) ? AppScaffold(houseId: savedHouseId) : const LoginScreen();
+
+  runApp(MyApp(startScreen: firstScreen));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Widget startScreen;
+  
+  // startScreen parametresini alıyoruz
+  const MyApp({super.key, required this.startScreen});
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +40,7 @@ class MyApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      // DÜZELTME BURADA: Uygulama artık LoginScreen ile başlıyor
-      home: const LoginScreen(), 
+      home: startScreen, // Başlangıç ekranı burada belirleniyor
     );
   }
 }

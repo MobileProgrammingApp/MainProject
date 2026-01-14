@@ -221,7 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Evet'),
+                      child: const Text('Evet', style: TextStyle(color: Colors.red)),
                     ),
                   ],
                 ),
@@ -229,14 +229,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               if (confirmed == true) {
                 final prefs = await SharedPreferences.getInstance();
-                await prefs.clear(); // Tüm verileri sil
+                await prefs.clear(); // 1. Tüm yerel verileri (ID, isim vb.) sil
 
                 if (!context.mounted) return;
 
-                Navigator.pushAndRemoveUntil(
-                  context,
+                // 2. 🔥 GEÇMİŞİ SİLEREK Giriş Ekranına Git
+                // (Geri tuşuna basınca tekrar uygulamaya dönemez)
+                Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (route) => false, 
+                  (Route<dynamic> route) => false, 
                 );
               }
             },

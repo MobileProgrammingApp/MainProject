@@ -51,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // Ana sayfaya yönlendir
         Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const AppScaffold()),
+        MaterialPageRoute(builder: (context) => AppScaffold(houseId: int.parse(result['user_id'].toString()))),
         (route) => false, // Geçmişteki tüm rotaları iptal et
         );
       } else {

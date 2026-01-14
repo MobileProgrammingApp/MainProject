@@ -12,18 +12,23 @@ class ShoppingScreen extends StatefulWidget {
 }
 
 class _ShoppingScreenState extends State<ShoppingScreen> {
-  // ==========================================
-  // 🛑 BACKEND DEĞİŞKENLERİ (DOKUNMA)
-  // Bu değişkenler market listesini ve kullanıcı bilgisini tutar.
-  // ==========================================
   final List<_ShoppingItem> _items = [];
   final TextEditingController _controller = TextEditingController();
-  int? currentUserId; 
+  
+  int? _currentHouseId; 
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadUserIdAndFetch(); 
+    // didChangeDependencies içinde çağrılacak
+  }
+
+  // --- DÜZELTME: Sayfa her odaklandığında çalışır ---
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadData();
   }
 
   @override
@@ -32,26 +37,42 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     super.dispose();
   }
 
-  // ==========================================
-  // 🛑 BACKEND FONKSİYONLARI (DOKUNMA)
-  // Sunucuyla konuşan, ürün ekleyen, silen ve işaretleyen kodlar.
-  // Tasarımla ilgisi yoktur.
-  // ==========================================
-
-  Future<void> _loadUserIdAndFetch() async {
+  // Verileri ve Kimliği Hafızadan Taze Çek
+  Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      currentUserId = prefs.getInt('saved_house_id');
-    });
+    // 🔥 ÖNEMLİ: Hafızayı tazele (Eski kullanıcının verisi kalmasın)
+    await prefs.reload();
+    // Önce temizle
+    if (mounted) {
+      setState(() {
+        _items.clear();
+        _isLoading = true;
+      });
+    }
 
-    if (currentUserId != null) {
-      _fetchItems();
+    int? savedId = prefs.getInt('saved_house_id');
+
+    if (savedId != null) {
+      if (mounted) {
+        setState(() {
+          _currentHouseId = savedId;
+        });
+      }
+      await _fetchItems();
+    } else {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _fetchItems() async {
+    if (_currentHouseId == null) return;
+
     try {
-      final response = await http.get(Uri.parse("https://swordarchitecture.com/api/get_items.php"));
+      final response = await http.get(Uri.parse("https://swordarchitecture.com/api/get_items.php?user_id=$_currentHouseId"));
       if (response.statusCode == 200) {
         List data = json.decode(response.body);
         
@@ -68,6 +89,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                 order: 0,
               ));
             }
+            _isLoading = false;
           });
         }
       }
@@ -77,13 +99,13 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
   }
 
   Future<void> _addItem(String name) async {
-    if (currentUserId == null) return;
+    if (_currentHouseId == null) return;
 
     try {
       final response = await http.post(
         Uri.parse("https://swordarchitecture.com/api/add_item.php"),
         body: {
-          "user_id": currentUserId.toString(),
+          "user_id": _currentHouseId.toString(),
           "item_name": name,
         },
       );
@@ -105,11 +127,6 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
 
     final bool currentStatus = _items[idx].done;
     final String nextStatus = currentStatus ? "0" : "1";
-
-    // Hızlı tepki için arayüzü güncelle
-    setState(() {
-       // İsteğe bağlı: _items[idx] = _items[idx].copyWith(done: !currentStatus);
-    });
 
     try {
       final response = await http.post(
@@ -141,15 +158,9 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
       print("Silme hatası: $e");
     }
   }
-  // ==========================================
-  // 🏁 BACKEND BİTİŞ
-  // ==========================================
-
 
   // ==========================================
-  // 🎨 TASARIM ALANI (FRONTEND)
-  // Buradan aşağısı ekran görüntüsüyle ilgilidir.
-  // Market listesinin renklerini, kart şekillerini buradan değiştirebilirsin.
+  // 🎨 TASARIM ALANI
   // ==========================================
 
   @override
@@ -160,7 +171,6 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     return Scaffold(
       backgroundColor: AppStyles.backgroundColor, 
       
-      // --- APPBAR TASARIMI ---
       appBar: AppBar(
         title: const Text('🛒 Market Listesi'), 
         actions: [
@@ -174,21 +184,19 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
               ),
             ),
           ),
-          // Temizle butonu
           if (done.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.cleaning_services, color: AppStyles.accentColor),
               tooltip: "Alınanları Temizle",
               onPressed: () async {
                 for (var item in done) {
-                  await _deleteById(item.id); // Backend fonksiyonu çağırılıyor
+                  await _deleteById(item.id); 
                 }
               },
             ),
         ],
       ),
       
-      // --- FAB (EKLEME BUTONU) ---
       floatingActionButton: FloatingActionButton(
         heroTag: "btn_add_shopping_item",
         onPressed: _showAddItemSheet,
@@ -196,38 +204,39 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
         child: const Icon(Icons.add_shopping_cart, color: Colors.white),
       ),
 
-      // --- LİSTE GÖRÜNÜMÜ ---
-      body: _items.isEmpty 
-        ? _buildEmptyState()
-        : ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              // ALINACAKLAR BAŞLIĞI
-              if (pending.isNotEmpty) ...[
-                Text(
-                  'Alınacaklar', 
-                  style: Theme.of(context).textTheme.headlineSmall, 
-                ),
-                const SizedBox(height: 10),
-                ...pending.map((it) => _buildShoppingCard(it, false)),
-              ],
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(
+            onRefresh: _loadData, // Çek bırak yenile
+            child: _items.isEmpty 
+              ? _buildEmptyState()
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (pending.isNotEmpty) ...[
+                      Text(
+                        'Alınacaklar', 
+                        style: Theme.of(context).textTheme.headlineSmall, 
+                      ),
+                      const SizedBox(height: 10),
+                      ...pending.map((it) => _buildShoppingCard(it, false)),
+                    ],
 
-              // ALINANLAR BAŞLIĞI
-              if (done.isNotEmpty) ...[
-                const SizedBox(height: 30),
-                Text(
-                  'Sepete Atılanlar', 
-                  style: Theme.of(context).textTheme.headlineSmall, 
+                    if (done.isNotEmpty) ...[
+                      const SizedBox(height: 30),
+                      Text(
+                        'Sepete Atılanlar', 
+                        style: Theme.of(context).textTheme.headlineSmall, 
+                      ),
+                      const SizedBox(height: 10),
+                      ...done.map((it) => _buildShoppingCard(it, true)),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 10),
-                ...done.map((it) => _buildShoppingCard(it, true)),
-              ],
-            ],
-          ),
+        ),
     );
   }
 
-  // --- KART TASARIMI ---
   Widget _buildShoppingCard(_ShoppingItem it, bool isDone) {
     return Card(
       elevation: 2, 
@@ -245,23 +254,23 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
           child: const Icon(Icons.delete_sweep, color: Colors.white),
         ),
         onDismissed: (direction) {
-          _deleteById(it.id); // Backend fonksiyonu
+          _deleteById(it.id); 
         },
         child: ListTile(
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           leading: Checkbox(
             value: it.done,
-            activeColor: Colors.green, // Alınınca yeşil olsun
+            activeColor: Colors.green, 
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
             onChanged: (val) {
-              _toggleById(it.id); // Backend fonksiyonu
+              _toggleById(it.id); 
             },
           ),
           title: Text(
             it.name,
             style: TextStyle(
               fontSize: 16,
-              fontWeight: isDone ? FontWeight.normal : FontWeight.bold, // Alınmayanlar kalın
+              fontWeight: isDone ? FontWeight.normal : FontWeight.bold,
               decoration: isDone ? TextDecoration.lineThrough : null,
               color: isDone ? Colors.grey : Colors.black87,
             ),
@@ -270,14 +279,13 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
               ? const Icon(Icons.check_circle, color: Colors.green)
               : const Icon(Icons.circle_outlined, color: Colors.grey),
           onTap: () {
-            _toggleById(it.id); // Backend fonksiyonu
+            _toggleById(it.id); 
           },
         ),
       ),
     );
   }
 
-  // --- BOŞ LİSTE TASARIMI ---
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -292,7 +300,6 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     );
   }
 
-  // --- EKLEME PENCERESİ TASARIMI ---
   Future<void> _showAddItemSheet() async {
     _controller.clear();
     await showModalBottomSheet(
@@ -348,7 +355,6 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
   }
 }
 
-// Veri Modeli (Bu kısım teknik bir yapıdır, UI değil)
 class _ShoppingItem {
   final int id;
   final int order;

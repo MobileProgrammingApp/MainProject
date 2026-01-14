@@ -15,44 +15,60 @@ class ChoresScreen extends StatefulWidget {
 
 class _ChoresScreenState extends State<ChoresScreen> {
   // ==========================================
-  // 🛑 BACKEND DEĞİŞKENLERİ (DOKUNMA)
-  // Bu değişkenler verileri tutar.
+  // 🛑 BACKEND DEĞİŞKENLERİ
   // ==========================================
   List<Map<String, String>> _pendingChores = [];
   List<Map<String, String>> _completedChores = [];
   
   int? currentUserId;
   List<dynamic> _houseMembers = []; 
+  bool _isLoading = true; // Yükleniyor durumu eklendi
 
   @override
   void initState() {
     super.initState();
-    _loadUserAndData(); 
+    // didChangeDependencies içinde çağrılacak
   }
 
+  // Sayfa her ekrana geldiğinde verileri yenile
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (currentUserId != null) {
-      _fetchHouseMembers(); 
-    }
+    _loadUserAndData(); 
   }
 
   // ==========================================
-  // 🛑 BACKEND FONKSİYONLARI BAŞLANGIÇ (DOKUNMA)
-  // Buradaki kodlar sunucuyla konuşur, veri çeker, siler.
-  // Tasarımla ilgisi yoktur. Burayı değiştirirsen işler bozulur.
+  // 🛑 BACKEND FONKSİYONLARI
   // ==========================================
   
   Future<void> _loadUserAndData() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      currentUserId = prefs.getInt('saved_house_id');
-    });
+    
+    // 1. DÜZELTME: Hafızayı tazele
+    await prefs.reload();
+
+    // 2. DÜZELTME: Eski verileri temizle ve yükleniyor moduna geç
+    if (mounted) {
+      setState(() {
+        _pendingChores.clear();
+        _completedChores.clear();
+        _houseMembers.clear();
+        _isLoading = true; // Yükleniyor...
+        currentUserId = prefs.getInt('saved_house_id');
+      });
+    }
 
     if (currentUserId != null) {
-      _fetchChores();
-      _fetchHouseMembers(); 
+      // Sırasıyla verileri çek
+      await _fetchHouseMembers(); 
+      await _fetchChores();
+    } else {
+      // ID yoksa yüklemeyi bitir
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -73,11 +89,20 @@ class _ChoresScreenState extends State<ChoresScreen> {
   }
 
   Future<void> _fetchChores() async {
-    List data = await ApiService.getChores();
+    if (currentUserId == null) return;
+
+    // ApiService.getChores fonksiyonuna ID göndermeliyiz (Backend düzeltmesiyle uyumlu olması için)
+    // Eğer ApiService'deki getChores parametre almıyorsa, orayı da güncellemen gerekebilir.
+    // Şimdilik varsayılan haliyle bırakıyorum ama ID filtresi önemli.
+    List data = await ApiService.getChores(currentUserId!); 
+    
     if (mounted) {
       setState(() {
         _pendingChores = data
-            .where((c) => c['is_done'].toString() == "0")
+            .where((c) {
+              var val = c['is_done'];
+              return val == 0 || val == "0" || val == false || val == "false" || val == null;
+            })
             .map((c) => {
                   'id': c['id'].toString(),
                   'name': c['task_name'].toString(),
@@ -86,13 +111,18 @@ class _ChoresScreenState extends State<ChoresScreen> {
             .toList();
 
         _completedChores = data
-            .where((c) => c['is_done'].toString() == "1")
+            .where((c) {
+               var val = c['is_done'];
+               return val == 1 || val == "1" || val == true || val == "true";
+            })
             .map((c) => {
                   'id': c['id'].toString(),
                   'name': c['task_name'].toString(),
                   'assigned': c['assigned_to_id'].toString(),
                 })
             .toList();
+        
+        _isLoading = false; // Yükleme bitti
       });
     }
   }
@@ -139,15 +169,9 @@ class _ChoresScreenState extends State<ChoresScreen> {
       }
     }
   }
-  // ==========================================
-  // 🏁 BACKEND FONKSİYONLARI BİTİŞ
-  // ==========================================
-
 
   // ==========================================
-  // 🎨 TASARIM ALANI BAŞLANGIÇ
-  // Buradan aşağısı tamamen ekran görüntüsüyle ilgilidir.
-  // Renkleri, kart şekillerini, yazıları değiştirebilirsin.
+  // 🎨 TASARIM ALANI
   // ==========================================
 
   void _showAddTaskModal() async {
@@ -194,30 +218,46 @@ class _ChoresScreenState extends State<ChoresScreen> {
         onPressed: _showAddTaskModal, 
         child: const Icon(Icons.add),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: <Widget>[
-          Text(
-            'Şu Anda Bekleyen Görevler',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 10),
-          ..._pendingChores.map((chore) => _buildPendingChoreCard(chore, context)),
+      // Yükleniyor kontrolü eklendi
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadUserAndData, // Aşağı çekince yenile
+              child: ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: <Widget>[
+                  Text(
+                    'Şu Anda Bekleyen Görevler',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 10),
+                  if (_pendingChores.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Text("Bekleyen görev yok!", style: TextStyle(color: Colors.grey)),
+                    ),
+                  ..._pendingChores.map((chore) => _buildPendingChoreCard(chore, context)),
 
-          const SizedBox(height: 30),
+                  const SizedBox(height: 30),
 
-          Text(
-            'Bugün Tamamlananlar',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 10),
-          ..._completedChores.map((chore) => _buildCompletedChoreCard(chore)),
-        ],
-      ),
+                  Text(
+                    'Bugün Tamamlananlar',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 10),
+                  if (_completedChores.isEmpty && _pendingChores.isNotEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(20.0),
+                      child: Text("Henüz bir görev tamamlanmadı.", style: TextStyle(color: Colors.grey)),
+                    ),
+                  ..._completedChores.map((chore) => _buildCompletedChoreCard(chore)),
+                ],
+              ),
+            ),
     );
   }
 
-  // --- KART TASARIMI 1 (BEKLEYENLER) ---
+  // --- KART TASARIMLARI (AYNI KALDI) ---
   Widget _buildPendingChoreCard(Map<String, String> chore, BuildContext context) {
     String assignedName = chore['assigned']!; 
     
@@ -246,14 +286,13 @@ class _ChoresScreenState extends State<ChoresScreen> {
         trailing: IconButton(
           icon: const Icon(Icons.check_circle_outline, color: Colors.green),
           onPressed: () {
-            _completeChore(chore); // Backend çağrısı (düğmeye basınca çalışır)
+            _completeChore(chore); 
           },
         ),
       ),
     );
   }
 
-  // --- KART TASARIMI 2 (TAMAMLANANLAR) ---
   Widget _buildCompletedChoreCard(Map<String, String> chore) {
     String assignedName = chore['assigned']!;
     
@@ -281,7 +320,7 @@ class _ChoresScreenState extends State<ChoresScreen> {
         trailing: IconButton(
           icon: const Icon(Icons.delete_outline, color: Colors.red),
           onPressed: () {
-            _deleteChore(chore['id']!); // Backend çağrısı
+            _deleteChore(chore['id']!); 
           },
         ),
       ),
@@ -289,10 +328,7 @@ class _ChoresScreenState extends State<ChoresScreen> {
   }
 }
 
-// ==========================================
-// 🎨 FORM TASARIMI (GÜVENLİ ALAN)
-// Görev ekleme ekranının görüntüsü
-// ==========================================
+// --- FORM WIDGET (AYNI KALDI) ---
 class AddChoreForm extends StatefulWidget {
   final Function(String name, String assignedUserId) onAddChore;
   final List<dynamic> members; 

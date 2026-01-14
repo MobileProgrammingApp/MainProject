@@ -7,7 +7,8 @@ import '../screens/settings_screen.dart';
 import 'app_theme.dart';
 
 class AppScaffold extends StatefulWidget {
-  const AppScaffold({super.key});
+  final int houseId; 
+  const AppScaffold({super.key, required this.houseId});
 
   @override
   State<AppScaffold> createState() => _AppScaffoldState();
@@ -16,33 +17,29 @@ class AppScaffold extends StatefulWidget {
 class _AppScaffoldState extends State<AppScaffold> {
   int _selectedIndex = 0;
 
-  // ==========================================
-  // ⚙️ NAVİGASYON MANTIĞI (DOKUNMA)
-  // Burası sayfa geçişlerini yönetir. Backend değil ama
-  // burası bozulursa menü çalışmaz.
-  // ==========================================
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
   }
-  // ==========================================
-  // 🏁 MANTIK BİTİŞ
-  // ==========================================
 
   @override
   Widget build(BuildContext context) {
-    // Sayfaları build içinde tanımlıyoruz ki navigasyon fonksiyonunu HomeScreen'e aktarabilelim
+    // 🛠️ DEĞİŞİKLİK: Artık ChoresScreen ve ShoppingScreen'e ID göndermiyoruz.
+    // Kendileri hafızadan (SharedPreferences) okuyacaklar.
+    // Bu sayede HomeInfoScreen gibi sorunsuz çalışacaklar.
     final List<Widget> _pages = [
-      HomeScreen(onTabChange: _onItemTapped), 
-      const ChoresScreen(),
-      const ShoppingScreen(),
-      const HomeInfoScreen(),
-      const SettingsScreen(),
+      // 🛑 'const' kelimelerini KALDIRIYORUZ ve 'key: UniqueKey()' ekliyoruz
+      // Bu sayede her giriş yapıldığında sayfalar sıfırdan üretilir.
+      
+      HomeScreen(key: UniqueKey(), onTabChange: _onItemTapped), 
+      ChoresScreen(key: UniqueKey()), 
+      ShoppingScreen(key: UniqueKey()),
+      HomeInfoScreen(key: UniqueKey()),
+      SettingsScreen(key: UniqueKey()),
     ];
 
     return Scaffold(
-      // 🎨 TASARIM KISMI - BURAYI DÜZENLEYEBİLİRSİN
       body: IndexedStack(
         index: _selectedIndex,
         children: _pages,
@@ -51,9 +48,9 @@ class _AppScaffoldState extends State<AppScaffold> {
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: AppStyles.accentColor, // Seçili ikon rengi
-        unselectedItemColor: Colors.grey,         // Seçili olmayan ikon rengi
-        backgroundColor: Colors.white,            // Arka plan rengi
+        selectedItemColor: AppStyles.accentColor, 
+        unselectedItemColor: Colors.grey,         
+        backgroundColor: Colors.white,            
         elevation: 8,
         items: const [
           BottomNavigationBarItem(
