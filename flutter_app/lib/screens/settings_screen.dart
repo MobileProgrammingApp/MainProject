@@ -7,6 +7,7 @@ import '../screens/notifications_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/manageHome_screen.dart';
 import '../../core/app_theme.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 final String baseUrl = "https://swordarchitecture.com/api"; 
 
@@ -92,9 +93,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('saved_member_id', int.parse(newId));
     
-    if(mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Kişi seçimi kaydedildi")));
+    try {
+    String? token = await FirebaseMessaging.instance.getToken();
+    print(token);
+    
+    if (token != null) {
+      // PHP API'nize gönderiyoruz
+      final response = await http.post(
+        Uri.parse("$baseUrl/update_member_token.php"),
+        body: {
+          "member_id": newId,
+          "fcm_token": token,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        print("Token veritabanında bu üye ile eşleşti.");
+      }
     }
+  } catch (e) {
+    print("Token gönderilirken hata oluştu: $e");
+  }
+
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Kişi seçimi ve bildirim ayarları kaydedildi")),
+    );
+  }
   }
   // ==========================================
   // 🏁 BACKEND BİTİŞ
