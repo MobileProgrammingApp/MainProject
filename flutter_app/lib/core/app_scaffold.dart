@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import '../navbars/home.dart';
-import '../navbars/chores.dart';
-import '../navbars/shopping.dart';
-import '../navbars/home_info_screen.dart';
+import '../screens/home.dart';
+import '../screens/chores.dart';
+import '../screens/shopping.dart';
+import '../screens/home_info_screen.dart';
 import '../screens/settings_screen.dart';
 import 'app_theme.dart';
 

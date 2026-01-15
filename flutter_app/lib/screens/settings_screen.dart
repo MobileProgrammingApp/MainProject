@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import '../navbars/login_screen.dart';
+import 'login_screen.dart';
 import '../screens/notifications_screen.dart';
 import '../screens/profile_screen.dart';
 import '../screens/manageHome_screen.dart';

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/app_scaffold.dart';
 import 'register_screen.dart';
-import 'api_service.dart'; 
+import '../core/api_service.dart'; 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -38,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = false);
 
-    if (result['status'] == 'success') {
+    if (result['status'] == 'success') {      
       // --- BAŞARILI İSE HAFIZAYA KAYDETME ---
       final prefs = await SharedPreferences.getInstance();
       
@@ -46,7 +47,10 @@ class _LoginScreenState extends State<LoginScreen> {
       // Bunu telefona kaydediyoruz ki uygulama açılınca hatırlasın.
       await prefs.setInt('saved_house_id', int.parse(result['user_id'].toString()));
       await prefs.setString('saved_house_name', result['house_name']); 
-      
+
+      String? token = await FirebaseMessaging.instance.getToken();
+
+
       if (!mounted) return;
       // Ana sayfaya yönlendir
         Navigator.pushAndRemoveUntil(

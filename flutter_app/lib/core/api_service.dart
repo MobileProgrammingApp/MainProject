@@ -14,7 +14,6 @@ import 'dart:convert';
 
 class ApiService {
   
-  // ⚠️ ANA SUNUCU ADRESİ - KESİNLİKLE DEĞİŞTİRME
   static const String baseUrl = "https://swordarchitecture.com/api";  
 
   static Future<bool> addItem(int userId, String itemName) async {

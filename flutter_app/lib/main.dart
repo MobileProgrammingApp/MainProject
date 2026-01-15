@@ -2,12 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app_scaffold.dart';
 import 'core/app_theme.dart';
-import 'navbars/login_screen.dart'; 
+import 'screens/login_screen.dart'; 
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
-  // Flutter motorunu başlat (Async işlemler için gerekli)
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -25,7 +24,6 @@ void main() async {
   Widget firstScreen;
 
   if (savedHouseId == null) {
-    // 1. Durum: Hiç giriş yapılmamış -> Login ekranına git
     firstScreen = const LoginScreen();
   } else if (savedMemberId == null) {
     // 2. Durum: Giriş yapılmış ama "Ben Kimim" seçilmemiş -> Üye seçme ekranına git

@@ -2,8 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/app_theme.dart';
-import '../navbars/api_service.dart';
-import '../navbars/home_info_screen.dart';
+import '../core/api_service.dart';
+import 'home_info_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final Function(int) onTabChange;
