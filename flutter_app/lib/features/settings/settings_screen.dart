@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'login_screen.dart';
-import '../screens/notifications_screen.dart';
-import '../screens/profile_screen.dart';
-import '../screens/manageHome_screen.dart';
-import '../../core/app_theme.dart';
+import '../auth/login_screen.dart';
+import '../notifications/notifications_screen.dart';
+import '../profile/profile_screen.dart';
+import '../home/manageHome_screen.dart';
+import '../../../core/app_theme.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 final String baseUrl = "https://swordarchitecture.com/api"; 

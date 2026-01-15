@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../screens/home.dart';
-import '../screens/chores.dart';
-import '../screens/shopping.dart';
-import '../screens/home_info_screen.dart';
-import '../screens/settings_screen.dart';
+import '../features/home/home_screen.dart';
+import '../features/chores/chores.dart';
+import '../features/chores/shopping.dart';
+import '../features/home/home_info_screen.dart';
+import '../features/settings/settings_screen.dart';
 import 'app_theme.dart';
 
 class AppScaffold extends StatefulWidget {

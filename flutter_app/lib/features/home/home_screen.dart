@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../core/app_theme.dart';
-import '../core/api_service.dart';
+import '../../core/app_theme.dart';
+import '../../core/api_service.dart';
 import 'home_info_screen.dart';
 
 class HomeScreen extends StatefulWidget {

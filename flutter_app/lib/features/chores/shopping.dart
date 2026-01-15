@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../core/app_theme.dart';
+import '../../core/app_theme.dart';
 
 class ShoppingScreen extends StatefulWidget {
   const ShoppingScreen({super.key});

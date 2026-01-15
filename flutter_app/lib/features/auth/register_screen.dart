@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../core/api_service.dart'; 
-import '../core/app_scaffold.dart'; 
+import '../../core/api_service.dart'; 
+import '../../core/app_scaffold.dart'; 
 import 'package:shared_preferences/shared_preferences.dart'; // EKLENDİ
 
 class RegisterScreen extends StatefulWidget {

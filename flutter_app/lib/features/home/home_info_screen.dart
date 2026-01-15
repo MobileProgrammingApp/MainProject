@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/app_theme.dart';
-import '../core/api_service.dart'; 
+import '../../../core/app_theme.dart';
+import '../../core/api_service.dart'; 
 
 class HomeInfoScreen extends StatefulWidget {
   const HomeInfoScreen({super.key});
