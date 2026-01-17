@@ -1,5 +1,5 @@
 <?php
-include 'db.php'; // veya db.php (senin dosya adın neyse)
+include 'db.php';
 header('Content-Type: application/json; charset=utf-8');
 
 $house_id = $_POST['house_id'];

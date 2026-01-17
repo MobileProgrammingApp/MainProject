@@ -43,9 +43,6 @@ try {
 
 
 function sendFCMNotificationV1($targetToken, $title, $body) {
-    $keyFilePath = 'keys/mobileproject-9eb7e-3444dbc5b84c.json';
-    // ---------------
-
     // 1. Google OAuth2 Access Token Al (Kütüphanesiz)
     $accessToken = getGoogleAccessToken($keyFilePath);
     
