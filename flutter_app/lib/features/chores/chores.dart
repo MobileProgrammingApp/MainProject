@@ -4,7 +4,7 @@ import 'dart:convert';
 import '../../core/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-final String baseUrl = "https://swordarchitecture.com/api";
+final String baseUrl = "https://homepal.swordarchitecture.com";
 
 class ChoresScreen extends StatefulWidget {
   const ChoresScreen({super.key});

@@ -72,7 +72,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     if (_currentHouseId == null) return;
 
     try {
-      final response = await http.get(Uri.parse("https://swordarchitecture.com/api/get_items.php?user_id=$_currentHouseId"));
+      final response = await http.get(Uri.parse("https://homepal.swordarchitecture.com/get_items.php?user_id=$_currentHouseId"));
       if (response.statusCode == 200) {
         List data = json.decode(response.body);
         
@@ -103,7 +103,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse("https://swordarchitecture.com/api/add_item.php"),
+        Uri.parse("https://homepal.swordarchitecture.com/add_item.php"),
         body: {
           "user_id": _currentHouseId.toString(),
           "item_name": name,
@@ -130,7 +130,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse("https://swordarchitecture.com/api/update_item.php"),
+        Uri.parse("https://homepal.swordarchitecture.com/update_item.php"),
         body: {
           "id": id.toString(),
           "is_bought": nextStatus,
@@ -148,7 +148,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
   Future<void> _deleteById(int id) async {
     try {
       final response = await http.post(
-        Uri.parse("https://swordarchitecture.com/api/delete_item.php"),
+        Uri.parse("https://homepal.swordarchitecture.com/delete_item.php"),
         body: {"id": id.toString()},
       );
       if (response.statusCode == 200) {

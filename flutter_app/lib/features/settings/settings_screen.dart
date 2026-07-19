@@ -9,7 +9,7 @@ import '../home/manageHome_screen.dart';
 import '../../../core/app_theme.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
-final String baseUrl = "https://swordarchitecture.com/api"; 
+final String baseUrl = "https://homepal.swordarchitecture.com";
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});

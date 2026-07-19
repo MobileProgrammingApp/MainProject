@@ -14,7 +14,7 @@ import 'dart:convert';
 
 class ApiService {
   
-  static const String baseUrl = "https://swordarchitecture.com/api";  
+  static const String baseUrl = "https://homepal.swordarchitecture.com";
 
   static Future<bool> addItem(int userId, String itemName) async {
     final response = await http.post(
