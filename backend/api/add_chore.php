@@ -1,16 +1,9 @@
 <?php
 
 include 'db.php';
-require_once __DIR__ . '/vendor/autoload.php';
 
-use Dotenv\Dotenv;
-
-// .env dosyasını yükle
-$dotenv = Dotenv::createImmutable(__DIR__);
-$dotenv->load();
-
-$projectId = $_ENV['PROJECT_ID'];
-$keyFilePath   = $_ENV['KEY_FILEPATH'];
+$projectId = $_ENV['PROJECT_ID'] ?? null;
+$keyFilePath   = $_ENV['KEY_FILEPATH'] ?? null;
 
 $creator_id = $_POST['creator_id'] ?? null;
 $assigned_to_id = $_POST['assigned_to_id'] ?? null;
@@ -30,22 +23,27 @@ try {
     $tokenStmt->execute([$assigned_to_id]);
     $member = $tokenStmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($member && !empty($member['fcm_token'])) {
-        $result = sendFCMNotificationV1($member['fcm_token'], "Yeni Görev!", "Sana bir görev atandı: " . $task_name);
-        echo json_encode(["status" => "success", "fcm_response" => json_decode($result)]);
+    if ($member && !empty($member['fcm_token']) && $projectId && $keyFilePath) {
+        try {
+            $result = sendFCMNotificationV1($projectId, $keyFilePath, $member['fcm_token'], "Yeni Görev!", "Sana bir görev atandı: " . $task_name);
+            echo json_encode(["status" => "success", "fcm_response" => json_decode($result)]);
+        } catch (Exception $e) {
+            // Görev zaten eklendi; bildirim gönderilemedi diye istemciye hata dönmeyelim
+            echo json_encode(["status" => "success", "message" => "Görev eklendi, bildirim gönderilemedi: " . $e->getMessage()]);
+        }
     } else {
         echo json_encode(["status" => "success", "message" => "Görev eklendi ancak hedef üyenin token'ı bulunamadı."]);
     }
-  
+
 } catch(Exception $e) {
     echo json_encode(["status" => "error", "message" => $e->getMessage()]);
 }
 
 
-function sendFCMNotificationV1($targetToken, $title, $body) {
+function sendFCMNotificationV1($projectId, $keyFilePath, $targetToken, $title, $body) {
     // 1. Google OAuth2 Access Token Al (Kütüphanesiz)
     $accessToken = getGoogleAccessToken($keyFilePath);
-    
+
     // 2. FCM v1 URL
     $url = "https://fcm.googleapis.com/v1/projects/$projectId/messages:send";
 
