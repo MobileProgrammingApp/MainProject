@@ -25,7 +25,7 @@ function authenticateRequest(PDO $conn): array {
         exit;
     }
 
-    $stmt = $conn->prepare("SELECT id, house_name FROM users WHERE api_token = ?");
+    $stmt = $conn->prepare("SELECT id, house_name, email FROM users WHERE api_token = ?");
     $stmt->execute([$token]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 

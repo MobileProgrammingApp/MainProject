@@ -249,6 +249,39 @@ class ApiService {
     return {};
   }
 
+  static Future<Map<String, dynamic>> getProfile() async {
+    try {
+      final token = await _getToken();
+      final response = await http.get(Uri.parse("$baseUrl/get_profile.php?api_token=${token ?? ''}"));
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+    } catch (e) {
+      print("Profil çekme hatası: $e");
+    }
+    return {};
+  }
+
+  static Future<Map<String, dynamic>> changePassword(String currentPassword, String newPassword) async {
+    try {
+      final token = await _getToken();
+      final response = await http.post(
+        Uri.parse("$baseUrl/change_password.php"),
+        body: {
+          "api_token": token ?? '',
+          "current_password": currentPassword,
+          "new_password": newPassword,
+        },
+      );
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      }
+    } catch (e) {
+      print("Şifre değiştirme hatası: $e");
+    }
+    return {"status": "error", "message": "Bağlantı hatası"};
+  }
+
   // Bilgi Ekle/Sil
   static Future<bool> addInfo(int houseId, String title, String value) async {
     final token = await _getToken();
