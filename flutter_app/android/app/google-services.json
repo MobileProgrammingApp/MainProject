@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "211607424911",
-    "project_id": "mobileproject-9eb7e",
-    "storage_bucket": "mobileproject-9eb7e.firebasestorage.app"
+    "project_number": "937652944869",
+    "project_id": "homepal-app-d0cb6",
+    "storage_bucket": "homepal-app-d0cb6.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:211607424911:android:d92be7907007c420e245fa",
+        "mobilesdk_app_id": "1:937652944869:android:1109029d9e23eb3513390c",
         "android_client_info": {
           "package_name": "com.example.flutter_app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAT3GvN-N3Qb4vqx0_ROcvGxg_XLaT5Oms"
+          "current_key": "AIzaSyBBchNzNJwK6sKhoHenVwndJg0f6Z5Br1E"
         }
       ],
       "services": {
