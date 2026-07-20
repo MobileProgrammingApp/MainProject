@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../core/api_service.dart'; 
-import '../../core/app_scaffold.dart'; 
-import 'package:shared_preferences/shared_preferences.dart'; // EKLENDİ
+import '../../core/api_service.dart';
+import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -53,32 +52,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (result['status'] == 'success') {
       if (!mounted) return;
 
-      // ---------------------------------------------------------
-      // 🛠️ DÜZELTME BURADA: HAFIZAYA KAYDETME İŞLEMİ EKLENDİ
-      // ---------------------------------------------------------
-      final prefs = await SharedPreferences.getInstance();
-      
-      // API'den dönen 'user_id' (veya id) değerini alıp telefona kaydediyoruz.
-      // NOT: PHP tarafında register.php dosyasının 'user_id' döndürdüğünden emin ol.
-      // Eğer PHP id döndürmüyorsa, kayıt olduktan sonra otomatik login fonksiyonunu çağırmak gerekir.
-      if (result['user_id'] != null) {
-         await prefs.setInt('saved_house_id', int.parse(result['user_id'].toString()));
-      }
-      
-      int newHouseId = int.parse(result['user_id'].toString());
-      
-      // Ev ismini de kaydedelim ki hemen görünsün
-      await prefs.setString('saved_house_name', _houseNameController.text);
-      // ---------------------------------------------------------
-      
+      // Kayıt sadece hesabı oluşturur; e-posta doğrulanana kadar giriş
+      // engellendiği için burada otomatik giriş yapmıyoruz.
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => AppScaffold(houseId: newHouseId)),
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
         (route) => false,
       );
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Kayıt Başarılı! Hoş geldiniz.")),
+        SnackBar(content: Text(result['message'] ?? "Kayıt başarılı! Lütfen e-postanızı doğrulayın.")),
       );
     } else {
       if (!mounted) return;
