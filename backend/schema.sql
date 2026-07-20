@@ -72,7 +72,9 @@ CREATE TABLE `users` (
   `id` int NOT NULL,
   `house_name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
   `email` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
-  `password` varchar(255) COLLATE utf8mb4_general_ci NOT NULL
+  `password` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
+  `email_verified` tinyint(1) NOT NULL DEFAULT '0',
+  `verification_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 ALTER TABLE `home_members`
