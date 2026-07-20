@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/app_scaffold.dart';
 import 'core/app_theme.dart';
-import 'features/auth/login_screen.dart'; 
+import 'core/notification_service.dart';
+import 'features/auth/login_screen.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -12,6 +13,8 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
    print("🔥 Firebase initialized");
+
+  await NotificationService.initialize();
 
   // Hafızayı kontrol et
   final prefs = await SharedPreferences.getInstance();
