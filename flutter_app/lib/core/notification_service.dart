@@ -40,21 +40,30 @@ class NotificationService {
     FirebaseMessaging.onMessage.listen(_showForegroundNotification);
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    FirebaseMessaging.instance.onTokenRefresh.listen(_registerToken);
+    FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+      if (await _isEnabled()) {
+        await _registerToken(token);
+      }
+    });
 
-    final token = await FirebaseMessaging.instance.getToken();
-    if (token != null) {
-      await _registerToken(token);
+    if (await _isEnabled()) {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await _registerToken(token);
+      }
     }
+  }
+
+  static Future<bool> _isEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('notificationsEnabled') ?? true;
   }
 
   static Future<void> _showForegroundNotification(RemoteMessage message) async {
     final notification = message.notification;
     if (notification == null) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    final enabled = prefs.getBool('notificationsEnabled') ?? true;
-    if (!enabled) return;
+    if (!await _isEnabled()) return;
 
     const androidDetails = AndroidNotificationDetails(
       'homepal_default_channel',

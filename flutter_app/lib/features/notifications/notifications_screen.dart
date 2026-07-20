@@ -15,7 +15,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
   // 🛑 BACKEND (DOKUNMA)
   // Bu kısım ayarları telefonun hafızasına kaydeder.
   // ==========================================
-  bool _notificationsEnabled = true;
+  bool? _notificationsEnabled; // null = hafızadan henüz okunmadı
 
   @override
   void initState() {
@@ -54,21 +54,23 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
       appBar: AppBar(
         title: const Text('Bildirim Ayarları'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          ListTile(
-            title: const Text('Bildirimleri Aç/Kapat'),
-            // Sağ taraftaki açma kapama anahtarı
-            trailing: Switch(
-              value: _notificationsEnabled,
-              // Anahtara basınca Backend fonksiyonu çalışır:
-              onChanged: (value) => _updateNotificationPreference(value),
-              activeColor: Colors.green, // Açıkken renk (İsteğe bağlı)
+      body: _notificationsEnabled == null
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                ListTile(
+                  title: const Text('Bildirimleri Aç/Kapat'),
+                  // Sağ taraftaki açma kapama anahtarı
+                  trailing: Switch(
+                    value: _notificationsEnabled!,
+                    // Anahtara basınca Backend fonksiyonu çalışır:
+                    onChanged: (value) => _updateNotificationPreference(value),
+                    activeColor: Colors.green, // Açıkken renk (İsteğe bağlı)
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }
