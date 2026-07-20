@@ -145,11 +145,20 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
         },
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && json.decode(response.body)['status'] == 'success') {
         await _fetchItems();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Güncellenemedi")),
+        );
       }
     } catch (e) {
       print("Güncelleme hatası: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Bağlantı hatası")),
+        );
+      }
     }
   }
 
@@ -161,8 +170,12 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
         Uri.parse("https://homepal.swordarchitecture.com/delete_item.php"),
         body: {"api_token": token, "id": id.toString()},
       );
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && json.decode(response.body)['status'] == 'success') {
         _fetchItems();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Silinemedi")),
+        );
       }
     } catch (e) {
       print("Silme hatası: $e");

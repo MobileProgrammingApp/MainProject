@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/notification_service.dart';
 
 class NotificationSettingsScreen extends StatefulWidget {
   const NotificationSettingsScreen({super.key});
@@ -30,10 +31,9 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     });
   }
 
-  // Hafızaya yeni ayarı kaydet
+  // Hafızaya yeni ayarı kaydet ve sunucudaki kaydı senkronize et
   Future<void> _updateNotificationPreference(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notificationsEnabled', value);
+    await NotificationService.setEnabled(value);
     setState(() {
       _notificationsEnabled = value;
     });

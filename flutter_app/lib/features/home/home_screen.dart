@@ -23,7 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int pendingShoppingCount = 0;
   bool isLoading = true;
   Timer? _timer;
-  int? currentUserId;
   int? currentMemberId;
   int? currentHouseId; 
 
@@ -189,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // --- 🛑 BURASI BACKEND İŞLEMİDİR ---
               ElevatedButton(
                 onPressed: () async {
-                  int? targetId = currentHouseId ?? currentUserId; 
+                  int? targetId = currentHouseId;
                   if (targetId == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text("Oturum bilgisi yüklenemedi. Lütfen sayfayı yenileyin."))

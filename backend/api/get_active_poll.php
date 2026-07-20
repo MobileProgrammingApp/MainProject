@@ -13,8 +13,6 @@ if (!memberBelongsToHouse($conn, $member_id, $house_id)) {
 }
 
 try {
-    $conn->query("DELETE FROM polls WHERE created_at < (NOW() - INTERVAL 24 HOUR)");
-
     $stmt = $conn->prepare("SELECT id, question FROM polls WHERE house_id = ? AND is_active = 1 ORDER BY id DESC LIMIT 1");
     $stmt->execute([$house_id]);
     $poll = $stmt->fetch(PDO::FETCH_ASSOC);

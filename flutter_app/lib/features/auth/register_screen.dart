@@ -28,8 +28,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // ==========================================
   void _register() async {
     // Alanlar boş mu kontrol et
-    if (_houseNameController.text.isEmpty || 
-        _emailController.text.isEmpty || 
+    if (_houseNameController.text.isEmpty ||
+        _emailController.text.isEmpty ||
         _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Lütfen tüm alanları doldurun")),
@@ -37,7 +37,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    setState(() => _isLoading = true); 
+    final emailRegex = RegExp(r'^[\w\.\-]+@[\w\-]+\.[a-zA-Z]{2,}$');
+    if (!emailRegex.hasMatch(_emailController.text.trim())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen geçerli bir e-posta adresi girin")),
+      );
+      return;
+    }
+
+    if (_passwordController.text.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Şifre en az 6 karakter olmalı")),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
 
     // --- API İSTEĞİ BURADA YAPILIYOR ---
     final result = await ApiService.register(

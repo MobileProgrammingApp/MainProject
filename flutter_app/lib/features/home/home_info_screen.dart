@@ -69,19 +69,27 @@ class _HomeInfoScreenState extends State<HomeInfoScreen>
 
     if (currentUserId != null) {
       final data = await ApiService.getHomeDetails(currentUserId!);
-      if (data['status'] == 'success') {
-        setState(() {
+      setState(() {
+        if (data['status'] == 'success') {
           importantInfo = data['infos'];
           inventoryItems = data['inventory'];
-          isLoading = false;
-        });
-      }
+        }
+        isLoading = false;
+      });
+    } else {
+      setState(() => isLoading = false);
     }
   }
 
   // 2. Yeni Bilgi Ekle (API)
   Future<void> _addNewInfo() async {
     if (currentUserId == null) return;
+    if (_titleController.text.trim().isEmpty || _valueController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen başlık ve değeri doldurun")),
+      );
+      return;
+    }
     bool success = await ApiService.addInfo(
       currentUserId!,
       _titleController.text,
@@ -96,6 +104,12 @@ class _HomeInfoScreenState extends State<HomeInfoScreen>
   // 3. Yeni Eşya Ekle (API)
   Future<void> _addNewInventory() async {
     if (currentUserId == null) return;
+    if (_nameController.text.trim().isEmpty || _locationController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Lütfen eşya adı ve yerini doldurun")),
+      );
+      return;
+    }
     bool success = await ApiService.addInventory(
       currentUserId!,
       _nameController.text,

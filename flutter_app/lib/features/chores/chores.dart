@@ -156,11 +156,20 @@ class _ChoresScreenState extends State<ChoresScreen> {
         Uri.parse("$baseUrl/update_chore.php"),
         body: {"api_token": token, "id": chore['id']},
       );
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && json.decode(response.body)['status'] == 'success') {
         _fetchChores();
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Görev tamamlanamadı")),
+        );
       }
     } catch (e) {
       print("Güncelleme hatası: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Bağlantı hatası")),
+        );
+      }
     }
   }
 

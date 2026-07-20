@@ -52,6 +52,10 @@ class NotificationService {
     final notification = message.notification;
     if (notification == null) return;
 
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool('notificationsEnabled') ?? true;
+    if (!enabled) return;
+
     const androidDetails = AndroidNotificationDetails(
       'homepal_default_channel',
       'Homepal Bildirimleri',
@@ -67,6 +71,21 @@ class NotificationService {
       notification.body,
       details,
     );
+  }
+
+  /// Bildirim aç/kapa switch'i tarafından çağrılır: kapatınca sunucudaki
+  /// fcm_token'ı boşaltır (bu üyeye artık bildirim gönderilmez), açınca
+  /// güncel token'ı yeniden kaydeder.
+  static Future<void> setEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notificationsEnabled', enabled);
+
+    if (enabled) {
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) await _registerToken(token);
+    } else {
+      await _registerToken('');
+    }
   }
 
   static Future<void> _registerToken(String token) async {
