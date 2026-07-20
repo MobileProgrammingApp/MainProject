@@ -1,18 +1,19 @@
 <?php
 include 'db.php';
+require_once __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
-$house_id = $_GET['house_id'];
+$user = authenticateRequest($conn);
 
 try {
     // Bilgileri Çek
     $stmtInfo = $conn->prepare("SELECT * FROM house_infos WHERE house_id = ? ORDER BY id DESC");
-    $stmtInfo->execute([$house_id]);
+    $stmtInfo->execute([$user['id']]);
     $infos = $stmtInfo->fetchAll(PDO::FETCH_ASSOC);
 
     // Envanteri Çek
     $stmtInv = $conn->prepare("SELECT * FROM house_inventory WHERE house_id = ? ORDER BY id DESC");
-    $stmtInv->execute([$house_id]);
+    $stmtInv->execute([$user['id']]);
     $inventory = $stmtInv->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([

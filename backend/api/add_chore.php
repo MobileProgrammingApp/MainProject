@@ -2,16 +2,24 @@
 
 include 'db.php';
 require_once __DIR__ . '/fcm_helper.php';
+require_once __DIR__ . '/auth.php';
+
+$user = authenticateRequest($conn);
 
 $projectId = $_ENV['PROJECT_ID'] ?? null;
 $keyFilePath   = $_ENV['KEY_FILEPATH'] ?? null;
 
-$creator_id = $_POST['creator_id'] ?? null;
+$creator_id = $user['id'];
 $assigned_to_id = $_POST['assigned_to_id'] ?? null;
 $task_name = $_POST['task_name'] ?? null;
 
-if (!$creator_id || !$assigned_to_id || !$task_name) {
+if (!$assigned_to_id || !$task_name) {
     echo json_encode(["status" => "error", "message" => "Eksik veri gönderildi"]);
+    exit;
+}
+
+if (!memberBelongsToHouse($conn, $assigned_to_id, $creator_id)) {
+    echo json_encode(["status" => "error", "message" => "Geçersiz üye"]);
     exit;
 }
 

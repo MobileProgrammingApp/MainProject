@@ -72,7 +72,9 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     if (_currentHouseId == null) return;
 
     try {
-      final response = await http.get(Uri.parse("https://homepal.swordarchitecture.com/get_items.php?user_id=$_currentHouseId"));
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('api_token') ?? '';
+      final response = await http.get(Uri.parse("https://homepal.swordarchitecture.com/get_items.php?user_id=$_currentHouseId&api_token=$token"));
       if (response.statusCode == 200) {
         List data = json.decode(response.body);
         
@@ -102,9 +104,12 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     if (_currentHouseId == null) return;
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('api_token') ?? '';
       final response = await http.post(
         Uri.parse("https://homepal.swordarchitecture.com/add_item.php"),
         body: {
+          "api_token": token,
           "user_id": _currentHouseId.toString(),
           "item_name": name,
         },
@@ -129,9 +134,12 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     final String nextStatus = currentStatus ? "0" : "1";
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('api_token') ?? '';
       final response = await http.post(
         Uri.parse("https://homepal.swordarchitecture.com/update_item.php"),
         body: {
+          "api_token": token,
           "id": id.toString(),
           "is_bought": nextStatus,
         },
@@ -147,9 +155,11 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
 
   Future<void> _deleteById(int id) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('api_token') ?? '';
       final response = await http.post(
         Uri.parse("https://homepal.swordarchitecture.com/delete_item.php"),
-        body: {"id": id.toString()},
+        body: {"api_token": token, "id": id.toString()},
       );
       if (response.statusCode == 200) {
         _fetchItems();

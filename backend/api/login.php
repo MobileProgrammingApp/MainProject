@@ -23,10 +23,21 @@ try {
             exit;
         }
 
+        // Hesap bazlı, sabit bir token: aynı ev hesabıyla birden fazla
+        // cihaz/aile üyesi aynı anda giriş yapabildiği için her girişte
+        // yeniden üretilmiyor, sadece ilk seferinde oluşturuluyor.
+        if (empty($row['api_token'])) {
+            $apiToken = bin2hex(random_bytes(32));
+            $conn->prepare("UPDATE users SET api_token = ? WHERE id = ?")->execute([$apiToken, $row['id']]);
+        } else {
+            $apiToken = $row['api_token'];
+        }
+
         echo json_encode([
             "status" => "success",
             "user_id" => $row['id'],
-            "house_name" => $row['house_name']
+            "house_name" => $row['house_name'],
+            "api_token" => $apiToken
         ]);
     } else {
         echo json_encode([

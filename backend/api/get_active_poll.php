@@ -1,9 +1,17 @@
 <?php
 include 'db.php';
+require_once __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
-$house_id = $_GET['house_id'];
+$user = authenticateRequest($conn);
+$house_id = $user['id'];
 $member_id = $_GET['member_id'];
+
+if (!memberBelongsToHouse($conn, $member_id, $house_id)) {
+    echo json_encode(["status" => "error", "message" => "Geçersiz üye"]);
+    exit;
+}
+
 try {
     $conn->query("DELETE FROM polls WHERE created_at < (NOW() - INTERVAL 24 HOUR)");
 

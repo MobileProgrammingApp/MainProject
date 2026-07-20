@@ -47,7 +47,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (houseId != null) {
       try {
-        final response = await http.get(Uri.parse("$baseUrl/get_members.php?house_id=$houseId"));
+        final token = prefs.getString('api_token') ?? '';
+        final response = await http.get(Uri.parse("$baseUrl/get_members.php?house_id=$houseId&api_token=$token"));
         if (response.statusCode == 200) {
           setState(() {
             houseMembers = json.decode(response.body);
@@ -94,16 +95,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setInt('saved_member_id', int.parse(newId));
     
     try {
-    String? token = await FirebaseMessaging.instance.getToken();
-    print(token);
-    
-    if (token != null) {
+    String? fcmToken = await FirebaseMessaging.instance.getToken();
+
+    if (fcmToken != null) {
+      final apiToken = prefs.getString('api_token') ?? '';
       // PHP API'nize gönderiyoruz
       final response = await http.post(
         Uri.parse("$baseUrl/update_member_token.php"),
         body: {
+          "api_token": apiToken,
           "member_id": newId,
-          "fcm_token": token,
+          "fcm_token": fcmToken,
         },
       );
 

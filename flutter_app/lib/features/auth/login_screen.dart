@@ -36,7 +36,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       
       await prefs.setInt('saved_house_id', int.parse(result['user_id'].toString()));
-      await prefs.setString('saved_house_name', result['house_name']); 
+      await prefs.setString('saved_house_name', result['house_name']);
+      await prefs.setString('api_token', result['api_token'] ?? '');
 
       if (!mounted) return;
         Navigator.pushAndRemoveUntil(

@@ -75,7 +75,9 @@ class _ChoresScreenState extends State<ChoresScreen> {
   Future<void> _fetchHouseMembers() async {
     if (currentUserId == null) return;
     try {
-      final response = await http.get(Uri.parse("$baseUrl/get_members.php?house_id=$currentUserId"));
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('api_token') ?? '';
+      final response = await http.get(Uri.parse("$baseUrl/get_members.php?house_id=$currentUserId&api_token=$token"));
       if (response.statusCode == 200) {
         if (mounted) {
           setState(() {
@@ -148,9 +150,11 @@ class _ChoresScreenState extends State<ChoresScreen> {
 
   Future<void> _completeChore(Map<String, String> chore) async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('api_token') ?? '';
       final response = await http.post(
         Uri.parse("$baseUrl/update_chore.php"),
-        body: {"id": chore['id']},
+        body: {"api_token": token, "id": chore['id']},
       );
       if (response.statusCode == 200) {
         _fetchChores();

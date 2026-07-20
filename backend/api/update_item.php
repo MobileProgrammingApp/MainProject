@@ -1,11 +1,21 @@
 <?php
 include 'db.php';
+require_once __DIR__ . '/auth.php';
+
+$user = authenticateRequest($conn);
 
 if(isset($_POST['id']) && isset($_POST['is_bought'])){
     $id = $_POST['id'];
-    $is_bought = $_POST['is_bought']; 
-    
+    $is_bought = $_POST['is_bought'];
+
     try {
+        $check = $conn->prepare("SELECT id FROM shopping_list WHERE id = ? AND user_id = ?");
+        $check->execute([$id, $user['id']]);
+        if (!$check->fetch(PDO::FETCH_ASSOC)) {
+            echo json_encode(["status" => "error", "message" => "Ürün bulunamadı"]);
+            exit;
+        }
+
         $stmt = $conn->prepare("UPDATE shopping_list SET is_bought = ? WHERE id = ?");
         $stmt->execute([$is_bought, $id]);
         echo json_encode(["status" => "success"]);

@@ -1,21 +1,19 @@
 <?php
 include 'db.php';
+require_once __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
-$user_id = $_GET['user_id'];
+$user = authenticateRequest($conn);
+
 try {
-    
-    $stmtUser = $conn->prepare("SELECT house_name FROM users WHERE id = ?");
-    $stmtUser->execute([$user_id]);
-    $userRow = $stmtUser->fetch(PDO::FETCH_ASSOC);
-    $houseName = $userRow ? $userRow['house_name'] : "Evim";
+    $houseName = $user['house_name'];
 
     $stmtChores = $conn->prepare("SELECT COUNT(*) as count FROM house_chores WHERE creator_id = ? AND is_done = 0");
-    $stmtChores->execute([$user_id]);
+    $stmtChores->execute([$user['id']]);
     $choreCount = $stmtChores->fetch(PDO::FETCH_ASSOC)['count'];
 
     $stmtShopping = $conn->prepare("SELECT COUNT(*) as count FROM shopping_list WHERE user_id = ? AND is_bought = 0");
-    $stmtShopping->execute([$user_id]);
+    $stmtShopping->execute([$user['id']]);
     $shoppingCount = $stmtShopping->fetch(PDO::FETCH_ASSOC)['count'];
 
     echo json_encode([

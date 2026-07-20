@@ -1,6 +1,9 @@
 <?php
 include 'db.php';
 require_once __DIR__ . '/fcm_helper.php';
+require_once __DIR__ . '/auth.php';
+
+$user = authenticateRequest($conn);
 
 if(isset($_POST['id'])){
     $id = $_POST['id'];
@@ -12,10 +15,15 @@ if(isset($_POST['id'])){
         $choreStmt->execute([$id]);
         $chore = $choreStmt->fetch(PDO::FETCH_ASSOC);
 
+        if (!$chore || (int)$chore['creator_id'] !== (int)$user['id']) {
+            echo json_encode(["status" => "error", "message" => "Görev bulunamadı"]);
+            exit;
+        }
+
         $stmt = $conn->prepare("UPDATE house_chores SET is_done = 1 WHERE id = ?");
         $stmt->execute([$id]);
 
-        if ($chore && $projectId && $keyFilePath) {
+        if ($projectId && $keyFilePath) {
             $assigneeStmt = $conn->prepare("SELECT name FROM home_members WHERE id = ?");
             $assigneeStmt->execute([$chore['assigned_to_id']]);
             $assignee = $assigneeStmt->fetch(PDO::FETCH_ASSOC);

@@ -74,7 +74,8 @@ CREATE TABLE `users` (
   `email` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
   `password` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
   `email_verified` tinyint(1) NOT NULL DEFAULT '0',
-  `verification_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL
+  `verification_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `api_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 ALTER TABLE `home_members`
@@ -114,7 +115,8 @@ ALTER TABLE `shopping_list`
 
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `email` (`email`);
+  ADD UNIQUE KEY `email` (`email`),
+  ADD UNIQUE KEY `api_token` (`api_token`);
 
 ALTER TABLE `home_members` MODIFY `id` int NOT NULL AUTO_INCREMENT;
 ALTER TABLE `house_chores` MODIFY `id` int NOT NULL AUTO_INCREMENT;

@@ -74,10 +74,13 @@ class NotificationService {
     final memberId = prefs.getInt('saved_member_id');
     if (memberId == null) return;
 
+    final apiToken = prefs.getString('api_token') ?? '';
+
     try {
       await http.post(
         Uri.parse("${ApiService.baseUrl}/update_member_token.php"),
         body: {
+          "api_token": apiToken,
           "member_id": memberId.toString(),
           "fcm_token": token,
         },

@@ -1,14 +1,22 @@
 <?php
 include 'db.php';
 require_once __DIR__ . '/fcm_helper.php';
+require_once __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
+
+$user = authenticateRequest($conn);
+$house_id = $user['id'];
 
 // JSON olarak gelen veriyi al (Flutter'dan karmaşık veri göndereceğiz)
 $data = json_decode(file_get_contents('php://input'), true);
 
-$house_id = $data['house_id'];
-$question = $data['question'];
-$options = $data['options']; // Array olarak gelecek ["Pizza", "Burger"]
+$question = $data['question'] ?? null;
+$options = $data['options'] ?? null; // Array olarak gelecek ["Pizza", "Burger"]
+
+if (!$question || !is_array($options) || count($options) < 2) {
+    echo json_encode(["status" => "error", "message" => "Eksik veri gönderildi"]);
+    exit;
+}
 
 try {
     // 1. Varsa eski aktif anketleri pasife çek veya sil (Evde tek aktif anket olsun diye)
