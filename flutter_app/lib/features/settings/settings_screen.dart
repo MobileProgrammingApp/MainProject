@@ -19,13 +19,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  
   // ==========================================
   // 🛑 BACKEND DEĞİŞKENLERİ (DOKUNMA)
   // Bu değişkenler sunucudan gelen kişi listesini tutar.
   // ==========================================
   List<dynamic> houseMembers = [];
-  String? selectedMemberId; 
+  String? selectedMemberId;
   bool isLoading = true;
 
   @override
@@ -43,36 +42,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     int? houseId = prefs.getInt('saved_house_id');
-    int? savedMemberId = prefs.getInt('saved_member_id'); 
+    int? savedMemberId = prefs.getInt('saved_member_id');
 
     if (houseId != null) {
       try {
         final token = prefs.getString('api_token') ?? '';
-        final response = await http.get(Uri.parse("$baseUrl/get_members.php?house_id=$houseId&api_token=$token"));
+        final response = await http.get(
+          Uri.parse(
+            "$baseUrl/get_members.php?house_id=$houseId&api_token=$token",
+          ),
+        );
         if (response.statusCode == 200) {
           setState(() {
             houseMembers = json.decode(response.body);
-            
+
             // --- KİŞİ KONTROLÜ (Daha önce seçilen kişi silinmiş mi?) ---
             if (savedMemberId != null) {
-              var exists = houseMembers.any((m) => m['id'].toString() == savedMemberId.toString());
-              
+              var exists = houseMembers.any(
+                (m) => m['id'].toString() == savedMemberId.toString(),
+              );
+
               if (exists) {
                 selectedMemberId = savedMemberId.toString();
               } else {
-                selectedMemberId = null; 
-                prefs.remove('saved_member_id'); 
+                selectedMemberId = null;
+                prefs.remove('saved_member_id');
               }
             } else {
-               if (selectedMemberId != null) {
-                  var exists = houseMembers.any((m) => m['id'].toString() == selectedMemberId);
-                  if (!exists) {
-                    selectedMemberId = null;
-                  }
-               }
+              if (selectedMemberId != null) {
+                var exists = houseMembers.any(
+                  (m) => m['id'].toString() == selectedMemberId,
+                );
+                if (!exists) {
+                  selectedMemberId = null;
+                }
+              }
             }
             // ---------------------------------------------------------
-            
+
             isLoading = false;
           });
         }
@@ -93,40 +100,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('saved_member_id', int.parse(newId));
-    
+
     try {
-    String? fcmToken = await FirebaseMessaging.instance.getToken();
+      String? fcmToken = await FirebaseMessaging.instance.getToken();
 
-    if (fcmToken != null) {
-      final apiToken = prefs.getString('api_token') ?? '';
-      // PHP API'nize gönderiyoruz
-      final response = await http.post(
-        Uri.parse("$baseUrl/update_member_token.php"),
-        body: {
-          "api_token": apiToken,
-          "member_id": newId,
-          "fcm_token": fcmToken,
-        },
-      );
+      if (fcmToken != null) {
+        final apiToken = prefs.getString('api_token') ?? '';
+        // PHP API'nize gönderiyoruz
+        final response = await http.post(
+          Uri.parse("$baseUrl/update_member_token.php"),
+          body: {
+            "api_token": apiToken,
+            "member_id": newId,
+            "fcm_token": fcmToken,
+          },
+        );
 
-      if (response.statusCode == 200) {
-        print("Token veritabanında bu üye ile eşleşti.");
+        if (response.statusCode == 200) {
+          print("Token veritabanında bu üye ile eşleşti.");
+        }
       }
+    } catch (e) {
+      print("Token gönderilirken hata oluştu: $e");
     }
-  } catch (e) {
-    print("Token gönderilirken hata oluştu: $e");
-  }
 
-  if (mounted) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Kişi seçimi ve bildirim ayarları kaydedildi")),
-    );
-  }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Kişi seçimi ve bildirim ayarları kaydedildi"),
+        ),
+      );
+    }
   }
   // ==========================================
   // 🏁 BACKEND BİTİŞ
   // ==========================================
-
 
   // ==========================================
   // 🎨 TASARIM ALANI (FRONTEND)
@@ -153,74 +161,159 @@ class _SettingsScreenState extends State<SettingsScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5)],
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("👤 Ben Kimim?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const Text(
+                  "👤 Ben Kimim?",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
                 const SizedBox(height: 8),
-                const Text("Uygulamayı hangi kişi olarak kullanıyorsunuz?", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const Text(
+                  "Uygulamayı hangi kişi olarak kullanıyorsunuz?",
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
                 const SizedBox(height: 10),
-                
-                isLoading 
-                  ? const Center(child: CircularProgressIndicator())
-                  : DropdownButtonFormField<String>(
-                      value: selectedMemberId,
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+
+                isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : houseMembers.isEmpty
+                    ? InkWell(
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                "Önce 'Evi Yönet' menüsünden bir kişi eklemelisiniz",
+                              ),
+                            ),
+                          );
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ManageHomeScreen(),
+                            ),
+                          ).then((value) => _loadSettings());
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade400),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.person_add_alt_1, color: Colors.grey),
+                              SizedBox(width: 10),
+                              Text(
+                                "Önce bir kişi ekleyin",
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : DropdownButtonFormField<String>(
+                        value: selectedMemberId,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        hint: const Text("Lütfen kendinizi seçin"),
+                        items: houseMembers.map<DropdownMenuItem<String>>((
+                          dynamic member,
+                        ) {
+                          return DropdownMenuItem<String>(
+                            value: member['id'].toString(),
+                            child: Text(member['name']),
+                          );
+                        }).toList(),
+                        onChanged:
+                            _onMemberChanged, // Backend fonksiyonunu tetikler
                       ),
-                      hint: const Text("Lütfen kendinizi seçin"),
-                      items: houseMembers.map<DropdownMenuItem<String>>((dynamic member) {
-                        return DropdownMenuItem<String>(
-                          value: member['id'].toString(),
-                          child: Text(member['name']),
-                        );
-                      }).toList(),
-                      onChanged: _onMemberChanged, // Backend fonksiyonunu tetikler
-                    ),
               ],
             ),
           ),
-          
+
           const SizedBox(height: 20),
           const Divider(),
 
           // 🔹 Profil Menüsü
           ListTile(
-            leading: const Icon(Icons.person_outline, color: AppStyles.primaryColor),
+            leading: const Icon(
+              Icons.person_outline,
+              color: AppStyles.primaryColor,
+            ),
             title: const Text('Profil', style: AppStyles.listTileTitle),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            trailing: const Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey,
+            ),
             onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProfileScreen()),
+              );
             },
           ),
           const Divider(),
 
           // 🔹 Ev Yönetim Menüsü
           ListTile(
-            leading: const Icon(Icons.home_work_outlined, color: AppStyles.primaryColor),
-            title: const Text('Evi Yönet (Kişi Ekle/Sil)', style: AppStyles.listTileTitle),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            leading: const Icon(
+              Icons.home_work_outlined,
+              color: AppStyles.primaryColor,
+            ),
+            title: const Text(
+              'Evi Yönet (Kişi Ekle/Sil)',
+              style: AppStyles.listTileTitle,
+            ),
+            trailing: const Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey,
+            ),
             onTap: () {
               Navigator.push(
-                context, 
-                MaterialPageRoute(builder: (_) => const ManageHomeScreen())
+                context,
+                MaterialPageRoute(builder: (_) => const ManageHomeScreen()),
               ).then((value) {
                 // Geri dönünce listeyi yenile (Backend işlemi)
-                _loadSettings(); 
+                _loadSettings();
               });
             },
           ),
 
           // 🔹 Bildirim Ayarları
           ListTile(
-            leading: const Icon(Icons.notifications_outlined, color: AppStyles.primaryColor),
+            leading: const Icon(
+              Icons.notifications_outlined,
+              color: AppStyles.primaryColor,
+            ),
             title: const Text('Bildirimler', style: AppStyles.listTileTitle),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            trailing: const Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Colors.grey,
+            ),
             onTap: () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const NotificationSettingsScreen()));
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationSettingsScreen(),
+                ),
+              );
             },
           ),
           const Divider(),
@@ -228,19 +321,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // 🔹 Çıkış Yap Butonu
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text('Çıkış Yap',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.redAccent,
-                  fontWeight: FontWeight.w500,
-                )),
+            title: const Text(
+              'Çıkış Yap',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             onTap: () async {
               // Çıkış onayı penceresi
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('Çıkış Yap'),
-                  content: const Text('Uygulamadan çıkmak istediğine emin misin?'),
+                  content: const Text(
+                    'Uygulamadan çıkmak istediğine emin misin?',
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.pop(context, false),
@@ -248,7 +345,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     TextButton(
                       onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Evet', style: TextStyle(color: Colors.red)),
+                      child: const Text(
+                        'Evet',
+                        style: TextStyle(color: Colors.red),
+                      ),
                     ),
                   ],
                 ),
@@ -264,7 +364,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // (Geri tuşuna basınca tekrar uygulamaya dönemez)
                 Navigator.of(context).pushAndRemoveUntil(
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (Route<dynamic> route) => false, 
+                  (Route<dynamic> route) => false,
                 );
               }
             },
