@@ -19,7 +19,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   
-  bool _isLoading = false; 
+  bool _isLoading = false;
+  bool _obscurePassword = true;
 
   // ==========================================
   // 🛑 BACKEND FONKSİYONU (DOKUNMA)
@@ -119,7 +120,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 15),
               
               // Şifre Kutusu
-              _buildField("Şifre", _passwordController, isPassword: true),
+              _buildField(
+                "Şifre",
+                _passwordController,
+                isPassword: true,
+                obscureText: _obscurePassword,
+                onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
               
               const SizedBox(height: 30),
               
@@ -143,15 +150,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   // Yardımcı Tasarım Parçası (Kutucukların şekli burada belirlenir)
-  Widget _buildField(String hint, TextEditingController controller, {bool isPassword = false}) {
+  Widget _buildField(
+    String hint,
+    TextEditingController controller, {
+    bool isPassword = false,
+    bool obscureText = false,
+    VoidCallback? onToggleObscure,
+  }) {
     return TextField(
-      controller: controller, 
-      obscureText: isPassword,
+      controller: controller,
+      obscureText: isPassword ? obscureText : false,
       decoration: InputDecoration(
         hintText: hint,
         filled: true,
         fillColor: Colors.grey.shade100,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+        suffixIcon: isPassword
+            ? IconButton(
+                icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
+                onPressed: onToggleObscure,
+              )
+            : null,
       ),
     );
   }

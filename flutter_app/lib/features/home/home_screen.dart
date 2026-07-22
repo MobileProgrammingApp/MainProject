@@ -427,7 +427,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _buildActionItem(Icons.info_rounded, "Ev Bilgi", () {
           Navigator.push(context, MaterialPageRoute(builder: (context) => const HomeInfoScreen()));
         }),
-        _buildActionItem(Icons.notifications_active, "Duyuru", () {}),
       ],
     );
   }
