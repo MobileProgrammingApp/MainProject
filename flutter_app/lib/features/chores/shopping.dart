@@ -298,11 +298,12 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
               color: isDone ? Colors.grey : Colors.black87,
             ),
           ),
-          trailing: isDone 
-              ? const Icon(Icons.check_circle, color: Colors.green)
-              : const Icon(Icons.circle_outlined, color: Colors.grey),
+          trailing: IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+            onPressed: () => _deleteById(it.id),
+          ),
           onTap: () {
-            _toggleById(it.id); 
+            _toggleById(it.id);
           },
         ),
       ),
