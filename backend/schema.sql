@@ -65,7 +65,8 @@ CREATE TABLE `shopping_list` (
   `id` int NOT NULL,
   `item_name` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
   `user_id` int DEFAULT NULL,
-  `is_bought` tinyint(1) DEFAULT '0'
+  `is_bought` tinyint(1) DEFAULT '0',
+  `added_by_member_id` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `users` (
@@ -111,7 +112,8 @@ ALTER TABLE `poll_votes`
 
 ALTER TABLE `shopping_list`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `user_id` (`user_id`);
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `added_by_member_id` (`added_by_member_id`);
 
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
@@ -153,4 +155,5 @@ ALTER TABLE `poll_votes`
   ADD CONSTRAINT `poll_votes_ibfk_3` FOREIGN KEY (`member_id`) REFERENCES `home_members` (`id`) ON DELETE CASCADE;
 
 ALTER TABLE `shopping_list`
-  ADD CONSTRAINT `shopping_list_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `shopping_list_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `shopping_list_ibfk_2` FOREIGN KEY (`added_by_member_id`) REFERENCES `home_members` (`id`) ON DELETE SET NULL;

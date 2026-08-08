@@ -106,12 +106,14 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('api_token') ?? '';
+      final memberId = prefs.getInt('saved_member_id');
       final response = await http.post(
         Uri.parse("https://homepal.swordarchitecture.com/add_item.php"),
         body: {
           "api_token": token,
           "user_id": _currentHouseId.toString(),
           "item_name": name,
+          if (memberId != null) "member_id": memberId.toString(),
         },
       );
 
