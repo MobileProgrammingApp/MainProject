@@ -16,16 +16,21 @@ function sendVerificationEmail(string $toEmail, string $toName, string $token): 
         $mail->CharSet = 'UTF-8';
 
         $mail->setFrom($_ENV['MAIL_USERNAME'], 'Homepal');
+        $mail->addReplyTo($_ENV['MAIL_USERNAME'], 'Homepal Destek');
         $mail->addAddress($toEmail, $toName);
 
         $verifyUrl = rtrim($_ENV['APP_URL'], '/') . '/verify_email.php?token=' . urlencode($token);
 
         $mail->isHTML(true);
-        $mail->Subject = 'Homepal - E-posta Adresinizi Doğrulayın';
-        $mail->Body = "Merhaba " . htmlspecialchars($toName) . ",<br><br>"
-            . "Homepal hesabınızı doğrulamak için <a href=\"$verifyUrl\">buraya tıklayın</a>.<br><br>"
-            . "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.";
-        $mail->AltBody = "Homepal hesabınızı doğrulamak için şu bağlantıya gidin: $verifyUrl";
+        $mail->Subject = 'Homepal hesap doğrulaması';
+        $mail->Body = "<p>Merhaba " . htmlspecialchars($toName) . ",</p>"
+            . "<p>Homepal uygulamasında bir hesap oluşturdunuz. Hesabınızı aktifleştirmek için aşağıdaki bağlantıya tıklayın:</p>"
+            . "<p><a href=\"$verifyUrl\">$verifyUrl</a></p>"
+            . "<p>Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz, hesabınız aktifleşmeyecektir.</p>"
+            . "<p>İyi günler,<br>Homepal Ekibi</p>";
+        $mail->AltBody = "Merhaba " . $toName . ",\n\n"
+            . "Homepal hesabınızı aktifleştirmek için şu bağlantıya gidin:\n$verifyUrl\n\n"
+            . "Bu isteği siz yapmadıysanız bu e-postayı yok sayabilirsiniz.\n\nİyi günler,\nHomepal Ekibi";
 
         $mail->send();
         return true;
