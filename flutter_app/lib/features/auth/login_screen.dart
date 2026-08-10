@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../core/app_scaffold.dart';
 import 'register_screen.dart';
-import '../../core/api_service.dart'; 
+import 'forgot_password_screen.dart';
+import '../../core/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -20,40 +21,47 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _login() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen alanları doldurun")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Lütfen alanları doldurun")));
       return;
     }
 
     setState(() => _isLoading = true);
 
     final result = await ApiService.login(
-      _emailController.text, 
-      _passwordController.text
+      _emailController.text,
+      _passwordController.text,
     );
 
     setState(() => _isLoading = false);
 
-    if (result['status'] == 'success') {      
+    if (result['status'] == 'success') {
       final prefs = await SharedPreferences.getInstance();
-      
-      await prefs.setInt('saved_house_id', int.parse(result['user_id'].toString()));
+
+      await prefs.setInt(
+        'saved_house_id',
+        int.parse(result['user_id'].toString()),
+      );
       await prefs.setString('saved_house_name', result['house_name']);
       await prefs.setString('api_token', result['api_token'] ?? '');
 
       if (!mounted) return;
-        Navigator.pushAndRemoveUntil(
+      Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => AppScaffold(houseId: int.parse(result['user_id'].toString()))),
+        MaterialPageRoute(
+          builder: (context) =>
+              AppScaffold(houseId: int.parse(result['user_id'].toString())),
+        ),
         (route) => false,
-        );
-      } else {
+      );
+    } else {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result['message'] ?? "Giriş başarısız")),
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -65,11 +73,15 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.home_work_rounded, size: 80, color: AppStyles.primaryColor),
+              const Icon(
+                Icons.home_work_rounded,
+                size: 80,
+                color: AppStyles.primaryColor,
+              ),
               const SizedBox(height: 20),
               const Text("HomePal", style: AppStyles.appBarTitle),
               const SizedBox(height: 40),
-              
+
               // E-Posta Kutusu
               TextField(
                 controller: _emailController,
@@ -77,7 +89,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   hintText: 'Ev Ortak Maili',
                   filled: true,
                   fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
               const SizedBox(height: 15),
@@ -90,32 +105,69 @@ class _LoginScreenState extends State<LoginScreen> {
                   hintText: 'Şifre',
                   filled: true,
                   fillColor: Colors.white,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                    borderSide: BorderSide.none,
+                  ),
                   suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
               ),
-              const SizedBox(height: 30),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ForgotPasswordScreen(),
+                    ),
+                  ),
+                  child: const Text(
+                    "Şifremi Unuttum?",
+                    style: TextStyle(color: AppStyles.primaryColor),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
 
               // Giriş Butonu
-              _isLoading 
-                ? const CircularProgressIndicator() 
-                : ElevatedButton(
-                    onPressed: _login, // Butona basılınca Backend fonksiyonu çalışır
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppStyles.primaryColor,
-                      minimumSize: const Size(double.infinity, 55),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              _isLoading
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed:
+                          _login, // Butona basılınca Backend fonksiyonu çalışır
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppStyles.primaryColor,
+                        minimumSize: const Size(double.infinity, 55),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                      ),
+                      child: const Text(
+                        "Giriş Yap",
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
                     ),
-                    child: const Text("Giriş Yap", style: TextStyle(color: Colors.white, fontSize: 16)),
-                  ),
-              
+
               // Kayıt Ol Linki
               TextButton(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen())),
-                child: const Text("Henüz bir ev hesabınız yok mu? Kaydol", style: TextStyle(color: AppStyles.primaryColor)),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const RegisterScreen(),
+                  ),
+                ),
+                child: const Text(
+                  "Henüz bir ev hesabınız yok mu? Kaydol",
+                  style: TextStyle(color: AppStyles.primaryColor),
+                ),
               ),
             ],
           ),

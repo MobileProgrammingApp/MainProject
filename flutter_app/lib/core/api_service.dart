@@ -14,7 +14,6 @@ import 'dart:convert';
 // ==========================================
 
 class ApiService {
-
   static const String baseUrl = "https://homepal.swordarchitecture.com";
 
   // Giriş sonrası kaydedilen hesap token'ı; her istekte sunucuya
@@ -42,15 +41,14 @@ class ApiService {
     return false;
   }
 
-
-  static Future<Map<String, dynamic>> login(String email, String password) async {
+  static Future<Map<String, dynamic>> login(
+    String email,
+    String password,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse("$baseUrl/login.php"),
-        body: {
-          "email": email,
-          "password": password,
-        },
+        body: {"email": email, "password": password},
       );
 
       if (response.statusCode == 200) {
@@ -63,15 +61,32 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> register(String houseName, String email, String password) async {
+  static Future<Map<String, dynamic>> forgotPassword(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse("$baseUrl/forgot_password.php"),
+        body: {"email": email},
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        return {"status": "error", "message": "Sunucu hatası"};
+      }
+    } catch (e) {
+      return {"status": "error", "message": "Bağlantı hatası: $e"};
+    }
+  }
+
+  static Future<Map<String, dynamic>> register(
+    String houseName,
+    String email,
+    String password,
+  ) async {
     try {
       final response = await http.post(
         Uri.parse("$baseUrl/register.php"),
-        body: {
-          "house_name": houseName,
-          "email": email,
-          "password": password,
-        },
+        body: {"house_name": houseName, "email": email, "password": password},
       );
 
       if (response.statusCode == 200) {
@@ -84,8 +99,11 @@ class ApiService {
     }
   }
 
-
-  static Future<bool> addChore(int creatorId, int assignedToId, String taskName) async {
+  static Future<bool> addChore(
+    int creatorId,
+    int assignedToId,
+    String taskName,
+  ) async {
     try {
       final token = await _getToken();
       final response = await http.post(
@@ -95,8 +113,8 @@ class ApiService {
           "creator_id": creatorId.toString(),
           "assigned_to_id": assignedToId.toString(),
           "task_name": taskName,
-          "house_id": creatorId.toString(), // Creator ID house ID olarak kullanılıyor
-
+          "house_id": creatorId
+              .toString(), // Creator ID house ID olarak kullanılıyor
         },
       );
       // --- DEBUG ---
@@ -117,7 +135,11 @@ class ApiService {
   static Future<List<dynamic>> getChores(int houseId) async {
     try {
       final token = await _getToken();
-      final response = await http.get(Uri.parse("$baseUrl/get_chores.php?house_id=$houseId&api_token=${token ?? ''}"));
+      final response = await http.get(
+        Uri.parse(
+          "$baseUrl/get_chores.php?house_id=$houseId&api_token=${token ?? ''}",
+        ),
+      );
 
       if (response.statusCode == 200) {
         // Gelen veriyi önce genel (dynamic) olarak alıyoruz
@@ -133,10 +155,11 @@ class ApiService {
 
           // EĞER "data" veya "chores" anahtarı altında liste varsa onu döndür
           if (decodedData.containsKey('data') && decodedData['data'] is List) {
-             return decodedData['data'];
+            return decodedData['data'];
           }
-          if (decodedData.containsKey('chores') && decodedData['chores'] is List) {
-             return decodedData['chores'];
+          if (decodedData.containsKey('chores') &&
+              decodedData['chores'] is List) {
+            return decodedData['chores'];
           }
 
           return [];
@@ -157,7 +180,11 @@ class ApiService {
 
       final response = await http.post(
         Uri.parse("$baseUrl/add_member.php"),
-        body: {"api_token": token ?? '', "house_id": houseId.toString(), "name": name},
+        body: {
+          "api_token": token ?? '',
+          "house_id": houseId.toString(),
+          "name": name,
+        },
       );
 
       print("Sunucu Cevabı (Status Code): ${response.statusCode}");
@@ -175,11 +202,14 @@ class ApiService {
     }
   }
 
-
   static Future<List<dynamic>> getFamilyMembers(int houseId) async {
     try {
       final token = await _getToken();
-      final response = await http.get(Uri.parse("$baseUrl/get_members.php?house_id=$houseId&api_token=${token ?? ''}"));
+      final response = await http.get(
+        Uri.parse(
+          "$baseUrl/get_members.php?house_id=$houseId&api_token=${token ?? ''}",
+        ),
+      );
 
       if (response.statusCode == 200) {
         final decodedData = json.decode(response.body);
@@ -187,19 +217,20 @@ class ApiService {
         if (decodedData is List) {
           return decodedData;
         } else if (decodedData is Map) {
-           if (decodedData.containsKey('data') && decodedData['data'] is List) {
-             return decodedData['data'];
-           }
-           if (decodedData.containsKey('members') && decodedData['members'] is List) {
-             return decodedData['members'];
-           }
+          if (decodedData.containsKey('data') && decodedData['data'] is List) {
+            return decodedData['data'];
+          }
+          if (decodedData.containsKey('members') &&
+              decodedData['members'] is List) {
+            return decodedData['members'];
+          }
           // Liste değilse (muhtemelen hata mesajı içeren bir Map'tir), boş liste dön
           print("Sunucudan liste gelmedi: $decodedData");
           return [];
         }
       }
     } catch (e) {
-        print("Bağlantı hatası: $e");
+      print("Bağlantı hatası: $e");
     }
     return [];
   }
@@ -226,7 +257,11 @@ class ApiService {
   static Future<Map<String, dynamic>> getHomeStats(int userId) async {
     try {
       final token = await _getToken();
-      final response = await http.get(Uri.parse("$baseUrl/get_home_stats.php?user_id=$userId&api_token=${token ?? ''}"));
+      final response = await http.get(
+        Uri.parse(
+          "$baseUrl/get_home_stats.php?user_id=$userId&api_token=${token ?? ''}",
+        ),
+      );
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
@@ -239,7 +274,11 @@ class ApiService {
   static Future<Map<String, dynamic>> getHomeDetails(int houseId) async {
     try {
       final token = await _getToken();
-      final response = await http.get(Uri.parse("$baseUrl/get_home_details.php?house_id=$houseId&api_token=${token ?? ''}"));
+      final response = await http.get(
+        Uri.parse(
+          "$baseUrl/get_home_details.php?house_id=$houseId&api_token=${token ?? ''}",
+        ),
+      );
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
@@ -252,7 +291,9 @@ class ApiService {
   static Future<Map<String, dynamic>> getProfile() async {
     try {
       final token = await _getToken();
-      final response = await http.get(Uri.parse("$baseUrl/get_profile.php?api_token=${token ?? ''}"));
+      final response = await http.get(
+        Uri.parse("$baseUrl/get_profile.php?api_token=${token ?? ''}"),
+      );
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
@@ -262,7 +303,10 @@ class ApiService {
     return {};
   }
 
-  static Future<Map<String, dynamic>> changePassword(String currentPassword, String newPassword) async {
+  static Future<Map<String, dynamic>> changePassword(
+    String currentPassword,
+    String newPassword,
+  ) async {
     try {
       final token = await _getToken();
       final response = await http.post(
@@ -285,26 +329,52 @@ class ApiService {
   // Bilgi Ekle/Sil
   static Future<bool> addInfo(int houseId, String title, String value) async {
     final token = await _getToken();
-    final response = await http.post(Uri.parse("$baseUrl/add_info.php"),
-      body: {"api_token": token ?? '', "house_id": houseId.toString(), "title": title, "value": value});
+    final response = await http.post(
+      Uri.parse("$baseUrl/add_info.php"),
+      body: {
+        "api_token": token ?? '',
+        "house_id": houseId.toString(),
+        "title": title,
+        "value": value,
+      },
+    );
     return response.statusCode == 200;
   }
+
   static Future<bool> deleteInfo(int id) async {
     final token = await _getToken();
-    final response = await http.post(Uri.parse("$baseUrl/delete_info.php"), body: {"api_token": token ?? '', "id": id.toString()});
+    final response = await http.post(
+      Uri.parse("$baseUrl/delete_info.php"),
+      body: {"api_token": token ?? '', "id": id.toString()},
+    );
     return response.statusCode == 200;
   }
 
   // Envanter Ekle/Sil
-  static Future<bool> addInventory(int houseId, String itemName, String location) async {
+  static Future<bool> addInventory(
+    int houseId,
+    String itemName,
+    String location,
+  ) async {
     final token = await _getToken();
-    final response = await http.post(Uri.parse("$baseUrl/add_inventory.php"),
-      body: {"api_token": token ?? '', "house_id": houseId.toString(), "item_name": itemName, "location": location});
+    final response = await http.post(
+      Uri.parse("$baseUrl/add_inventory.php"),
+      body: {
+        "api_token": token ?? '',
+        "house_id": houseId.toString(),
+        "item_name": itemName,
+        "location": location,
+      },
+    );
     return response.statusCode == 200;
   }
+
   static Future<bool> deleteInventory(int id) async {
     final token = await _getToken();
-    final response = await http.post(Uri.parse("$baseUrl/delete_inventory.php"), body: {"api_token": token ?? '', "id": id.toString()});
+    final response = await http.post(
+      Uri.parse("$baseUrl/delete_inventory.php"),
+      body: {"api_token": token ?? '', "id": id.toString()},
+    );
     return response.statusCode == 200;
   }
 
@@ -325,10 +395,18 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> getActivePoll(int houseId, int memberId) async { // memberId eklendi
+  static Future<Map<String, dynamic>> getActivePoll(
+    int houseId,
+    int memberId,
+  ) async {
+    // memberId eklendi
     try {
       final token = await _getToken();
-      final response = await http.get(Uri.parse("$baseUrl/get_active_poll.php?house_id=$houseId&member_id=$memberId&api_token=${token ?? ''}"));
+      final response = await http.get(
+        Uri.parse(
+          "$baseUrl/get_active_poll.php?house_id=$houseId&member_id=$memberId&api_token=${token ?? ''}",
+        ),
+      );
       if (response.statusCode == 200) {
         return json.decode(response.body);
       }
@@ -338,7 +416,13 @@ class ApiService {
     return {};
   }
 
-  static Future<bool> votePoll(int pollId, int optionId, int houseId, int memberId) async { // Parametreler arttı
+  static Future<bool> votePoll(
+    int pollId,
+    int optionId,
+    int houseId,
+    int memberId,
+  ) async {
+    // Parametreler arttı
     try {
       final token = await _getToken();
       final response = await http.post(
@@ -348,7 +432,7 @@ class ApiService {
           "poll_id": pollId.toString(),
           "option_id": optionId.toString(),
           "house_id": houseId.toString(),
-          "member_id": memberId.toString()
+          "member_id": memberId.toString(),
         },
       );
       var data = json.decode(response.body);
@@ -359,7 +443,11 @@ class ApiService {
   }
 
   // Yeni Anket Oluştur (YENİ)
-  static Future<bool> createPoll(int houseId, String question, List<String> options) async {
+  static Future<bool> createPoll(
+    int houseId,
+    String question,
+    List<String> options,
+  ) async {
     try {
       final token = await _getToken();
       final response = await http.post(
@@ -369,7 +457,7 @@ class ApiService {
           "api_token": token ?? '',
           "house_id": houseId,
           "question": question,
-          "options": options
+          "options": options,
         }),
       );
       return response.statusCode == 200;

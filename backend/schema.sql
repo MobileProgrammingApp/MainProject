@@ -76,7 +76,9 @@ CREATE TABLE `users` (
   `password` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
   `email_verified` tinyint(1) NOT NULL DEFAULT '0',
   `verification_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `api_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL
+  `api_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `reset_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `reset_token_expires` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 ALTER TABLE `home_members`
