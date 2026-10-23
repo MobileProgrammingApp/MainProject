@@ -3,18 +3,17 @@ include 'db.php';
 require_once __DIR__ . '/auth.php';
 
 $user = authenticateRequest($conn);
-$id = $_POST['id'];
+$id = requireInt($_POST, 'id');
 
 try {
-    $check = $conn->prepare("SELECT id FROM house_infos WHERE id = ? AND house_id = ?");
-    $check->execute([$id, $user['id']]);
-    if (!$check->fetch(PDO::FETCH_ASSOC)) {
-        echo json_encode(["status" => "error", "message" => "Bulunamadı"]);
-        exit;
-    }
+    // Sahiplik kontrolü sorgunun içinde: başka evin bilgisi silinemez
+    $stmt = $conn->prepare("DELETE FROM house_infos WHERE id = ? AND house_id = ?");
+    $stmt->execute([$id, $user['id']]);
 
-    $stmt = $conn->prepare("DELETE FROM house_infos WHERE id = ?");
-    $stmt->execute([$id]);
+    if ($stmt->rowCount() === 0) {
+        jsonError("Bulunamadı");
+    }
     echo json_encode(["status" => "success"]);
-} catch(Exception $e) { echo json_encode(["status" => "error"]); }
-?>
+} catch (Exception $e) {
+    serverError($e);
+}

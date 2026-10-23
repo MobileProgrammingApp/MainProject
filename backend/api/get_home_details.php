@@ -1,7 +1,6 @@
 <?php
 include 'db.php';
 require_once __DIR__ . '/auth.php';
-header('Content-Type: application/json; charset=utf-8');
 
 $user = authenticateRequest($conn);
 
@@ -21,8 +20,6 @@ try {
         "infos" => $infos,
         "inventory" => $inventory
     ]);
-
-} catch(Exception $e) {
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+} catch (Exception $e) {
+    serverError($e);
 }
-?>

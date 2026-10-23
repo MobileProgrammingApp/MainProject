@@ -2,24 +2,35 @@
 include 'db.php';
 require_once __DIR__ . '/fcm_helper.php';
 require_once __DIR__ . '/auth.php';
-header('Content-Type: application/json; charset=utf-8');
+
+const MAX_POLL_OPTIONS = 10;
 
 $user = authenticateRequest($conn);
 $house_id = $user['id'];
 
-// JSON olarak gelen veriyi al (Flutter'dan karmaşık veri göndereceğiz)
+// JSON olarak gelen veriyi al: {"question": "...", "options": ["Pizza", "Burger"]}
 $data = json_decode(file_get_contents('php://input'), true);
-
-$question = $data['question'] ?? null;
-$options = $data['options'] ?? null; // Array olarak gelecek ["Pizza", "Burger"]
-
-if (!$question || !is_array($options) || count($options) < 2) {
-    echo json_encode(["status" => "error", "message" => "Eksik veri gönderildi"]);
-    exit;
+if (!is_array($data)) {
+    jsonError("Eksik veri gönderildi");
 }
 
+$question = requireText($data, 'question', 255, 'Soru');
+
+$options = $data['options'] ?? null;
+if (!is_array($options) || count($options) < 2) {
+    jsonError("En az 2 seçenek gerekli");
+}
+if (count($options) > MAX_POLL_OPTIONS) {
+    jsonError("En fazla " . MAX_POLL_OPTIONS . " seçenek eklenebilir");
+}
+$options = array_map(function ($i) use ($options) {
+    return requireText($options, $i, 100, 'Seçenek');
+}, array_keys($options));
+
 try {
-    // 1. Varsa eski aktif anketleri pasife çek veya sil (Evde tek aktif anket olsun diye)
+    $conn->beginTransaction();
+
+    // 1. Varsa eski anketleri sil (Evde tek aktif anket olsun diye)
     $conn->prepare("DELETE FROM polls WHERE house_id = ?")->execute([$house_id]);
 
     // 2. Yeni Anketi Oluştur
@@ -33,20 +44,16 @@ try {
         $stmtOpt->execute([$poll_id, $opt]);
     }
 
-    $projectId = $_ENV['PROJECT_ID'] ?? null;
-    $keyFilePath = $_ENV['KEY_FILEPATH'] ?? null;
+    $conn->commit();
 
-    if ($projectId && $keyFilePath) {
-        $membersStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE house_id = ? AND fcm_token IS NOT NULL AND fcm_token != ''");
-        $membersStmt->execute([$house_id]);
-        $tokens = $membersStmt->fetchAll(PDO::FETCH_COLUMN);
-
-        sendFCMToMembers($projectId, $keyFilePath, $tokens, "Yeni Anket", $question);
-    }
+    $membersStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE house_id = ?");
+    $membersStmt->execute([$house_id]);
+    notifyMembers($conn, $membersStmt->fetchAll(PDO::FETCH_COLUMN), "Yeni Anket", $question);
 
     echo json_encode(["status" => "success"]);
-
-} catch(Exception $e) {
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+} catch (Exception $e) {
+    if ($conn->inTransaction()) {
+        $conn->rollBack();
+    }
+    serverError($e);
 }
-?>

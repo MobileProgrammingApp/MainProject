@@ -1,13 +1,11 @@
 <?php
 include 'db.php';
 require_once __DIR__ . '/mailer.php';
-header('Content-Type: application/json; charset=utf-8');
 
-$email = trim($_POST['email'] ?? '');
+$email = inputString($_POST, 'email');
 
 if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    echo json_encode(["status" => "error", "message" => "Geçerli bir e-posta adresi girin"]);
-    exit;
+    jsonError("Geçerli bir e-posta adresi girin");
 }
 
 // Not: E-posta kayıtlı olsun ya da olmasın aynı mesajı döneriz, böylece
@@ -18,22 +16,35 @@ $genericResponse = [
 ];
 
 try {
-    $stmt = $conn->prepare("SELECT id, house_name FROM users WHERE email = ?");
-    $stmt->execute([$email]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Mail bombardımanı koruması: sınır aşılırsa sessizce mail atlanır,
+    // cevap yine aynıdır (sınırın kendisi de e-posta hakkında bilgi vermesin).
+    $limited = isRateLimited($conn, 'forgot_email', $email, 3, 3600)
+        || isRateLimited($conn, 'forgot_ip', clientIp(), 10, 3600);
 
-    if ($user) {
-        $token = bin2hex(random_bytes(32));
-        $expires = date('Y-m-d H:i:s', time() + 3600); // 1 saat geçerli
+    if (!$limited) {
+        recordAttempt($conn, 'forgot_email', $email);
+        recordAttempt($conn, 'forgot_ip', clientIp());
 
-        $update = $conn->prepare("UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?");
-        $update->execute([$token, $expires, $user['id']]);
+        $stmt = $conn->prepare("SELECT id, house_name FROM users WHERE email = ?");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        sendPasswordResetEmail($email, $user['house_name'], $token);
+        if ($user) {
+            $token = bin2hex(random_bytes(32));
+
+            // Veritabanına token'ın hash'i yazılır, düz hali sadece mailde.
+            // Süre (1 saat) MySQL'de hesaplanır: reset_password.php de NOW() ile
+            // kontrol ediyor, PHP ile MySQL saat dilimi farklı olsa bile tutarlı kalır.
+            $update = $conn->prepare("UPDATE users SET reset_token = ?, reset_token_expires = NOW() + INTERVAL 1 HOUR WHERE id = ?");
+            $update->execute([hashToken($token), $user['id']]);
+
+            sendPasswordResetEmail($email, $user['house_name'], $token);
+        }
     }
 
     echo json_encode($genericResponse);
-} catch (PDOException $e) {
+} catch (Exception $e) {
+    error_log("[homepal] forgot_password: " . $e->getMessage());
     echo json_encode($genericResponse);
 }
 ?>

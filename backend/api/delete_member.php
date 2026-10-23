@@ -1,25 +1,19 @@
 <?php
 include 'db.php';
 require_once __DIR__ . '/auth.php';
-header('Content-Type: application/json; charset=utf-8');
 
 $user = authenticateRequest($conn);
-$id = $_POST['id'];
+$id = requireInt($_POST, 'id');
 
 try {
-    if (!memberBelongsToHouse($conn, $id, $user['id'])) {
-        echo json_encode(["status" => "error", "message" => "Üye bulunamadı"]);
-        exit;
-    }
+    // Sahiplik kontrolü sorgunun içinde: başka evin üyesi silinemez
+    $stmt = $conn->prepare("DELETE FROM home_members WHERE id = ? AND house_id = ?");
+    $stmt->execute([$id, $user['id']]);
 
-    $stmt = $conn->prepare("DELETE FROM home_members WHERE id = :id");
-
-    if ($stmt->execute(['id' => $id])) {
-        echo json_encode(["status" => "success"]);
-    } else {
-        echo json_encode(["status" => "error", "message" => "Silinemedi"]);
+    if ($stmt->rowCount() === 0) {
+        jsonError("Üye bulunamadı");
     }
-} catch (PDOException $e) {
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "success"]);
+} catch (Exception $e) {
+    serverError($e);
 }
-?>

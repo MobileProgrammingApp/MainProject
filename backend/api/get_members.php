@@ -1,17 +1,16 @@
 <?php
 include 'db.php';
 require_once __DIR__ . '/auth.php';
-header('Content-Type: application/json; charset=utf-8');
 
 $user = authenticateRequest($conn);
 
 try {
-    $stmt = $conn->prepare("SELECT * FROM home_members WHERE house_id = :house_id");
-    $stmt->execute(['house_id' => $user['id']]);
+    // fcm_token kasıtlı olarak dönülmüyor: diğer üyelerin cihaz token'larını
+    // istemcinin bilmesine gerek yok
+    $stmt = $conn->prepare("SELECT id, house_id, name, role FROM home_members WHERE house_id = ?");
+    $stmt->execute([$user['id']]);
 
-    $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    echo json_encode($members);
-} catch (PDOException $e) {
-    echo json_encode(["error" => $e->getMessage()]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+} catch (Exception $e) {
+    serverError($e);
 }
-?>

@@ -1,15 +1,13 @@
 <?php
 include 'db.php';
 require_once __DIR__ . '/auth.php';
-header('Content-Type: application/json; charset=utf-8');
 
 $user = authenticateRequest($conn);
 $house_id = $user['id'];
-$member_id = $_GET['member_id'];
+$member_id = requireInt($_GET, 'member_id');
 
 if (!memberBelongsToHouse($conn, $member_id, $house_id)) {
-    echo json_encode(["status" => "error", "message" => "Geçersiz üye"]);
-    exit;
+    jsonError("Geçersiz üye");
 }
 
 try {
@@ -37,8 +35,6 @@ try {
     } else {
         echo json_encode(["status" => "empty", "message" => "Aktif anket yok"]);
     }
-
-} catch(Exception $e) {
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+} catch (Exception $e) {
+    serverError($e);
 }
-?>

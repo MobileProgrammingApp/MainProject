@@ -33,6 +33,7 @@ vendor/
 
 # Database dumps (contain real user emails/passwords, never commit)
 *.sql
+!backend/migrations/*.sql
 
 # Android release signing (never commit — losing/leaking this blocks all future app updates)
 flutter_app/android/key.properties

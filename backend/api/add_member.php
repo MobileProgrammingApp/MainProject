@@ -1,24 +1,22 @@
 <?php
 include 'db.php';
 require_once __DIR__ . '/auth.php';
-header('Content-Type: application/json; charset=utf-8');
+
+const MAX_MEMBERS_PER_HOUSE = 50;
 
 $user = authenticateRequest($conn);
-$name = $_POST['name'] ?? '';
-
-if (!$name) {
-    echo json_encode(["status" => "error", "message" => "İsim gerekli"]);
-    exit;
-}
+$name = requireText($_POST, 'name', 100, 'İsim');
 
 try {
-    $stmt = $conn->prepare("INSERT INTO home_members (house_id, name) VALUES (:house_id, :name)");
-    if ($stmt->execute(['house_id' => $user['id'], 'name' => $name])) {
-        echo json_encode(["status" => "success"]);
-    } else {
-        echo json_encode(["status" => "error", "message" => "Eklenemedi"]);
+    $countStmt = $conn->prepare("SELECT COUNT(*) FROM home_members WHERE house_id = ?");
+    $countStmt->execute([$user['id']]);
+    if ((int) $countStmt->fetchColumn() >= MAX_MEMBERS_PER_HOUSE) {
+        jsonError("Bir eve en fazla " . MAX_MEMBERS_PER_HOUSE . " üye eklenebilir");
     }
-} catch (PDOException $e) {
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+
+    $stmt = $conn->prepare("INSERT INTO home_members (house_id, name) VALUES (?, ?)");
+    $stmt->execute([$user['id'], $name]);
+    echo json_encode(["status" => "success"]);
+} catch (Exception $e) {
+    serverError($e);
 }
-?>

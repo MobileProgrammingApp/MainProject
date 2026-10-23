@@ -12,19 +12,23 @@ Flutter mobil uygulaması (ev/ev arkadaşları için görev, market listesi, ev 
 - API adresi: `https://homepal.swordarchitecture.com` (Let's Encrypt SSL, certbot ile otomatik yenileniyor).
 - Sunucudaki proje yolu: `/var/www/homepal.swordarchitecture.com` (bu repo git clone edilmiş hali).
 - Deploy: sunucuda `cd /var/www/homepal.swordarchitecture.com && sudo git pull origin main && sudo chown -R www-data:www-data backend`.
-- DB şema değişikliklerinde: ilgili `ALTER TABLE` komutunu manuel çalıştırmak gerekiyor (otomatik migration sistemi yok).
+- DB şema değişikliklerinde: otomatik migration sistemi yok. Değişiklik `backend/migrations/YYYY-MM-DD_ad.sql` olarak eklenir (`.gitignore`'daki `*.sql` kuralından muaf), deploy'dan hemen sonra sunucuda bir kez `sudo mysql homepal_db < backend/migrations/...sql` ile çalıştırılır; `backend/schema.sql` de güncellenir.
+- Nginx (`/etc/nginx/sites-enabled/homepal.swordarchitecture.com`): web kökü `backend/api/` olduğu için `.env`, `keys/`, `*.json|sql|lock|env|md|log|bak` dışarı verilmiyor; HSTS ve güvenlik başlıkları burada. Web köküne asla gizli dosya koymayın.
+- Cron: `cleanup_polls.php` (sadece CLI) eski anketleri, deneme sınırı kayıtlarını ve 180 gün kullanılmayan oturumları temizler.
 - `.env` dosyası sunucuda `backend/api/.env` — DB bilgileri, `PROJECT_ID`/`KEY_FILEPATH` (Firebase), `MAIL_USERNAME`/`MAIL_PASSWORD` (Gmail SMTP), `APP_URL` içeriyor. Repo'da yok (gitignore), sadece sunucuda.
 
 ## Auth
-- Basit token tabanlı auth: `login.php` hesap bazlı sabit bir `api_token` üretir (JWT değil, session de değil — aynı ev hesabına birden fazla cihaz/üye aynı anda giriş yapabildiği için login'de yeniden üretilmiyor).
-- Her endpoint `backend/api/auth.php`'deki `authenticateRequest()` ile bu token'ı doğruluyor, `house_id`'yi client'tan değil token'dan alıyor (sahiplik kontrolü var).
-- Şifreler `password_hash`/`password_verify` ile hash'li.
-- Kayıt sırasında e-posta doğrulama zorunlu (`verify_email.php`), doğrulanmadan giriş engelleniyor.
+- Cihaz başına token: her `login.php` çağrısı `api_tokens` tablosuna yeni bir token açar (aynı ev hesabına birden fazla cihaz/üye aynı anda giriş yapabilir). Veritabanında token'ın sadece sha256 hash'i durur (`users.api_token` kolonu artık kullanılmıyor). Doğrulama ve şifre sıfırlama token'ları da hash'li.
+- Token şifre sıfırlanınca tüm cihazlarda, şifre değişince diğer cihazlarda iptal edilir; `logout.php` mevcut cihazınkini iptal eder.
+- Her endpoint `backend/api/auth.php`'deki `authenticateRequest()` ile token'ı doğruluyor, `house_id`'yi client'tan değil token'dan alıyor (sahiplik kontrolü sorgunun `WHERE`'inde). Token `Authorization: Bearer` başlığından okunur; Play Store'daki 1.0.2 ve öncesi için `api_token` form/query/JSON alanı da kabul ediliyor (eski sürümler güncellenince kaldırılabilir).
+- Ortak yardımcılar `backend/api/security.php`'de (db.php yükler): `jsonError`/`serverError` (iç hata detayı sadece `error_log`'a), `requireText`/`requireInt` girdi doğrulama, `isRateLimited`/`recordAttempt` (giriş, kayıt, şifremi unuttum, şifre değiştirme; `auth_attempts` tablosu).
+- Hata yanıtları kasıtlı olarak HTTP 200 + `{"status":"error"}`: eski sürümler 200 dışında mesajı göstermiyor. İstisna: geçersiz oturumda 401.
+- Şifreler bcrypt (8–72 karakter). Kayıt sırasında e-posta doğrulama zorunlu (`verify_email.php`). Kayıtlı bir e-postayla tekrar kayıt olunursa uygulama aynı cevabı verir, sahibine "hesabınız zaten var" maili gider (e-posta tahmini engellensin diye).
 
 ## Push Notification
 - Firebase projesi: `homepal-app-d0cb6` (geliştiricinin kendi hesabında, önceki bir arkadaşının projesinden bağımsız).
-- `backend/api/fcm_helper.php` — FCM v1 API ile bildirim gönderme (görev atama/tamamlama, yeni anket, market listesine ürün ekleme).
-- Firebase servis hesabı JSON anahtarı sunucuda `backend/api/keys/fcm-service-account.json` (gitignore'da, repo'da yok).
+- `backend/api/fcm_helper.php` — FCM v1 API ile bildirim gönderme (görev atama/tamamlama, yeni anket, market listesine ürün ekleme). Endpoint'ler `notifyMembers()` kullanır; Google `NOT_FOUND`/`UNREGISTERED` derse token DB'den silinir, hatalar `error_log`'a yazılır. Bir cihaz token'ı aynı anda tek üyede tutulur (`update_member_token.php`).
+- Firebase servis hesabı JSON anahtarı sunucuda **web kökünün dışında**: `/etc/homepal/fcm-service-account.json` (`root:www-data`, `640`), `.env`'de `KEY_FILEPATH`. Eskiden `backend/api/keys/` altındaydı ve web'den indirilebiliyordu; 2026-10-23'te o anahtar iptal edilip yenisi oluşturuldu.
 
 ## Play Store
 - Paket adı: `com.swordarchitecture.homepal` (değiştirilemez, kalıcı).

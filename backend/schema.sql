@@ -76,7 +76,7 @@ CREATE TABLE `users` (
   `password` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
   `email_verified` tinyint(1) NOT NULL DEFAULT '0',
   `verification_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL,
-  `api_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `api_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL, -- kullanılmıyor (2026-10-23'ten beri api_tokens tablosu)
   `reset_token` varchar(64) COLLATE utf8mb4_general_ci DEFAULT NULL,
   `reset_token_expires` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -159,3 +159,26 @@ ALTER TABLE `poll_votes`
 ALTER TABLE `shopping_list`
   ADD CONSTRAINT `shopping_list_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `shopping_list_ibfk_2` FOREIGN KEY (`added_by_member_id`) REFERENCES `home_members` (`id`) ON DELETE SET NULL;
+
+-- Cihaz başına oturum token'ları (sha256 hash'i saklanır) — bkz. migrations/2026-10-23_security.sql
+CREATE TABLE `api_tokens` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `user_id` int NOT NULL,
+  `token_hash` char(64) COLLATE utf8mb4_general_ci NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_used_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `token_hash` (`token_hash`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `api_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Deneme sınırı (rate limiting) kayıtları; subject = sha256(IP veya e-posta)
+CREATE TABLE `auth_attempts` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `action` varchar(32) COLLATE utf8mb4_general_ci NOT NULL,
+  `subject` char(64) COLLATE utf8mb4_general_ci NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `lookup` (`action`, `subject`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
