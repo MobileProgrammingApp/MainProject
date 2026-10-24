@@ -46,9 +46,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
-    if (_passwordController.text.length < 6) {
+    if (_passwordController.text.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Şifre en az 6 karakter olmalı")),
+        const SnackBar(content: Text("Şifre en az 8 karakter olmalı")),
       );
       return;
     }

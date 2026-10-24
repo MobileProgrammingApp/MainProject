@@ -1,9 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- allowBackup/dataExtractionRules: oturum token'ı Android Keystore ile şifreli
+         saklanıyor (flutter_secure_storage); anahtar yedeğe girmediği için geri
+         yüklenen veri okunamaz. Ayrıca token'ın yedeklerle cihaz dışına çıkmasını önler.
+         usesCleartextTraffic: API sadece HTTPS ile konuşulur. -->
     <application
         android:label="HomePal"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -89,9 +89,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               );
                               return;
                             }
-                            if (newController.text.length < 6) {
+                            if (newController.text.length < 8) {
                               ScaffoldMessenger.of(sheetContext).showSnackBar(
-                                const SnackBar(content: Text("Yeni şifre en az 6 karakter olmalı")),
+                                const SnackBar(content: Text("Yeni şifre en az 8 karakter olmalı")),
                               );
                               return;
                             }

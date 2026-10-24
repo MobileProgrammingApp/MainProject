@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/api_service.dart';
 import '../../core/app_theme.dart';
 
 class ShoppingScreen extends StatefulWidget {
@@ -71,60 +70,39 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
   Future<void> _fetchItems() async {
     if (_currentHouseId == null) return;
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('api_token') ?? '';
-      final response = await http.get(Uri.parse("https://homepal.swordarchitecture.com/get_items.php?user_id=$_currentHouseId&api_token=$token"));
-      if (response.statusCode == 200) {
-        List data = json.decode(response.body);
-        
-        if (mounted) {
-          setState(() {
-            _items.clear();
-            for (var item in data) {
-              bool isDone = (item['is_bought'] == 1 || item['is_bought'] == "1");
+    final data = await ApiService.getItems();
 
-              _items.add(_ShoppingItem(
-                id: int.parse(item['id'].toString()),
-                name: item['item_name'],
-                done: isDone,
-                order: 0,
-              ));
-            }
-            _isLoading = false;
-          });
+    if (mounted) {
+      setState(() {
+        _items.clear();
+        for (var item in data) {
+          bool isDone = (item['is_bought'] == 1 || item['is_bought'] == "1");
+
+          _items.add(_ShoppingItem(
+            id: int.parse(item['id'].toString()),
+            name: item['item_name'],
+            done: isDone,
+            order: 0,
+          ));
         }
-      }
-    } catch (e) {
-      print("Veri çekme hatası: $e");
+        _isLoading = false;
+      });
     }
   }
 
   Future<void> _addItem(String name) async {
     if (_currentHouseId == null) return;
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('api_token') ?? '';
-      final memberId = prefs.getInt('saved_member_id');
-      final response = await http.post(
-        Uri.parse("https://homepal.swordarchitecture.com/add_item.php"),
-        body: {
-          "api_token": token,
-          "user_id": _currentHouseId.toString(),
-          "item_name": name,
-          if (memberId != null) "member_id": memberId.toString(),
-        },
-      );
+    final prefs = await SharedPreferences.getInstance();
+    // Ekleyen üye biliniyorsa sunucu ona bildirim göndermez
+    final success = await ApiService.addItem(name, prefs.getInt('saved_member_id'));
 
-      if (response.statusCode == 200) {
-        var result = json.decode(response.body);
-        if (result['status'] == 'success') {
-          await _fetchItems(); 
-        }
-      }
-    } catch (e) {
-      print("Ekleme hatası: $e");
+    if (success) {
+      await _fetchItems();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Eklenemedi")),
+      );
     }
   }
 
@@ -132,55 +110,26 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     final idx = _items.indexWhere((e) => e.id == id);
     if (idx == -1) return;
 
-    final bool currentStatus = _items[idx].done;
-    final String nextStatus = currentStatus ? "0" : "1";
+    final success = await ApiService.setItemBought(id, !_items[idx].done);
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('api_token') ?? '';
-      final response = await http.post(
-        Uri.parse("https://homepal.swordarchitecture.com/update_item.php"),
-        body: {
-          "api_token": token,
-          "id": id.toString(),
-          "is_bought": nextStatus,
-        },
+    if (success) {
+      await _fetchItems();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Güncellenemedi")),
       );
-
-      if (response.statusCode == 200 && json.decode(response.body)['status'] == 'success') {
-        await _fetchItems();
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Güncellenemedi")),
-        );
-      }
-    } catch (e) {
-      print("Güncelleme hatası: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Bağlantı hatası")),
-        );
-      }
     }
   }
 
   Future<void> _deleteById(int id) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('api_token') ?? '';
-      final response = await http.post(
-        Uri.parse("https://homepal.swordarchitecture.com/delete_item.php"),
-        body: {"api_token": token, "id": id.toString()},
+    final success = await ApiService.deleteItem(id);
+
+    if (success) {
+      _fetchItems();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Silinemedi")),
       );
-      if (response.statusCode == 200 && json.decode(response.body)['status'] == 'success') {
-        _fetchItems();
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Silinemedi")),
-        );
-      }
-    } catch (e) {
-      print("Silme hatası: $e");
     }
   }
 

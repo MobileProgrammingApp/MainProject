@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
         int.parse(result['user_id'].toString()),
       );
       await prefs.setString('saved_house_name', result['house_name']);
-      await prefs.setString('api_token', result['api_token'] ?? '');
+      // Oturum token'ı ApiService.login içinde şifreli depolamaya kaydedildi
 
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(

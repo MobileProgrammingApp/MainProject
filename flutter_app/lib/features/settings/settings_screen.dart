@@ -1,15 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../home/manageHome_screen.dart';
+import '../../../core/api_service.dart';
 import '../../../core/app_theme.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-
-final String baseUrl = "https://homepal.swordarchitecture.com";
+import '../../../core/notification_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -46,15 +43,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (houseId != null) {
       try {
-        final token = prefs.getString('api_token') ?? '';
-        final response = await http.get(
-          Uri.parse(
-            "$baseUrl/get_members.php?house_id=$houseId&api_token=$token",
-          ),
-        );
-        if (response.statusCode == 200) {
+        final members = await ApiService.getFamilyMembers(houseId);
+        if (mounted) {
           setState(() {
-            houseMembers = json.decode(response.body);
+            houseMembers = members;
 
             // --- KİŞİ KONTROLÜ (Daha önce seçilen kişi silinmiş mi?) ---
             if (savedMemberId != null) {
@@ -84,7 +76,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           });
         }
       } catch (e) {
-        print("Kişi çekme hatası: $e");
+        debugPrint("Kişi çekme hatası: $e");
         setState(() => isLoading = false);
       }
     }
@@ -101,27 +93,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('saved_member_id', int.parse(newId));
 
+    // Bu cihazın bildirimleri artık seçilen üyeye gelsin (bildirimler açıksa)
     try {
-      String? fcmToken = await FirebaseMessaging.instance.getToken();
-
-      if (fcmToken != null) {
-        final apiToken = prefs.getString('api_token') ?? '';
-        // PHP API'nize gönderiyoruz
-        final response = await http.post(
-          Uri.parse("$baseUrl/update_member_token.php"),
-          body: {
-            "api_token": apiToken,
-            "member_id": newId,
-            "fcm_token": fcmToken,
-          },
-        );
-
-        if (response.statusCode == 200) {
-          print("Token veritabanında bu üye ile eşleşti.");
-        }
-      }
+      await NotificationService.syncToken();
     } catch (e) {
-      print("Token gönderilirken hata oluştu: $e");
+      debugPrint("Token gönderilirken hata oluştu: $e");
     }
 
     if (mounted) {
@@ -355,8 +331,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
 
               if (confirmed == true) {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.clear(); // 1. Tüm yerel verileri (ID, isim vb.) sil
+                // 1. Bildirimleri kapat, sunucudaki oturumu kapat, yerel verileri sil
+                await ApiService.logout();
 
                 if (!context.mounted) return;
 

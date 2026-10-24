@@ -1,6 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 
@@ -88,33 +88,26 @@ class NotificationService {
   static Future<void> setEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notificationsEnabled', enabled);
-
-    if (enabled) {
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token != null) await _registerToken(token);
-    } else {
-      await _registerToken('');
-    }
+    await syncToken();
   }
 
-  static Future<void> _registerToken(String token) async {
+  /// Seçili üyenin sunucudaki cihaz token'ını bildirim ayarına göre günceller.
+  /// "Ben Kimim?" profili değişince de çağrılır.
+  static Future<bool> syncToken() async {
+    if (!await _isEnabled()) {
+      return _registerToken('');
+    }
+    final token = await FirebaseMessaging.instance.getToken();
+    return token != null && await _registerToken(token);
+  }
+
+  static Future<bool> _registerToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     final memberId = prefs.getInt('saved_member_id');
-    if (memberId == null) return;
+    if (memberId == null) return false;
 
-    final apiToken = prefs.getString('api_token') ?? '';
-
-    try {
-      await http.post(
-        Uri.parse("${ApiService.baseUrl}/update_member_token.php"),
-        body: {
-          "api_token": apiToken,
-          "member_id": memberId.toString(),
-          "fcm_token": token,
-        },
-      );
-    } catch (e) {
-      print("FCM token kaydı başarısız: $e");
-    }
+    final ok = await ApiService.updateMemberToken(memberId, token);
+    if (!ok) debugPrint("FCM token kaydı başarısız");
+    return ok;
   }
 }

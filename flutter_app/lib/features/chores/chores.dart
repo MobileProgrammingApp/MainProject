@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import '../../core/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-final String baseUrl = "https://homepal.swordarchitecture.com";
 
 class ChoresScreen extends StatefulWidget {
   const ChoresScreen({super.key});
@@ -74,19 +70,11 @@ class _ChoresScreenState extends State<ChoresScreen> {
 
   Future<void> _fetchHouseMembers() async {
     if (currentUserId == null) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('api_token') ?? '';
-      final response = await http.get(Uri.parse("$baseUrl/get_members.php?house_id=$currentUserId&api_token=$token"));
-      if (response.statusCode == 200) {
-        if (mounted) {
-          setState(() {
-            _houseMembers = json.decode(response.body);
-          });
-        }
-      }
-    } catch (e) {
-      print("Üye çekme hatası: $e");
+    final members = await ApiService.getFamilyMembers(currentUserId!);
+    if (mounted) {
+      setState(() {
+        _houseMembers = members;
+      });
     }
   }
 
@@ -149,27 +137,13 @@ class _ChoresScreenState extends State<ChoresScreen> {
   }
 
   Future<void> _completeChore(Map<String, String> chore) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('api_token') ?? '';
-      final response = await http.post(
-        Uri.parse("$baseUrl/update_chore.php"),
-        body: {"api_token": token, "id": chore['id']},
+    final success = await ApiService.completeChore(int.parse(chore['id']!));
+    if (success) {
+      _fetchChores();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Görev tamamlanamadı")),
       );
-      if (response.statusCode == 200 && json.decode(response.body)['status'] == 'success') {
-        _fetchChores();
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Görev tamamlanamadı")),
-        );
-      }
-    } catch (e) {
-      print("Güncelleme hatası: $e");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Bağlantı hatası")),
-        );
-      }
     }
   }
 
