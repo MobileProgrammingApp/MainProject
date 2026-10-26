@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HomePal amblemi (gülen ev). Açılış ekranında kullanılır.
+     288dp: Android 12+ arka plansız açılış ikonu boyutu; içerik ortadaki
+     192dp'lik daireye sığar (viewport'ta merkezden 72 birim yarıçap).
+     Aynı çizim Flutter'da lib/core/widgets/homepal_mark.dart içinde var;
+     biri değişirse diğeri de güncellenmeli (açılışta kesintisiz geçiş için). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="288dp"
+    android:height="288dp"
+    android:viewportWidth="240"
+    android:viewportHeight="240">
+
+    <!-- Baca -->
+    <path
+        android:fillColor="#3B82F6"
+        android:pathData="M150,64 H160 A4,4 0 0 1 164,68 V100 H146 V68 A4,4 0 0 1 150,64 Z" />
+
+    <!-- Gövde (üst kenarı çatı çizgisinin altında kalır) -->
+    <path
+        android:fillColor="#F28C28"
+        android:pathData="M76,97.2 L120,62 L164,97.2 V160 A14,14 0 0 1 150,174 H90 A14,14 0 0 1 76,160 Z" />
+
+    <!-- Çatı -->
+    <path
+        android:pathData="M60,110 L120,62 L180,110"
+        android:strokeWidth="18"
+        android:strokeColor="#2563EB"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+
+    <!-- Kapı -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M109,174 V160 A11,11 0 0 1 131,160 V174 Z" />
+
+    <!-- Yanaklar -->
+    <path
+        android:fillAlpha="0.35"
+        android:fillColor="#E8590C"
+        android:pathData="M88,133 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 Z M140,133 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0 Z" />
+
+    <!-- Gözler ve gülüş -->
+    <path
+        android:pathData="M96,122 Q104,113 112,122 M128,122 Q136,113 144,122 M106,135 Q120,147 134,135"
+        android:strokeWidth="5"
+        android:strokeColor="#1E2A3B"
+        android:strokeLineCap="round" />
+</vector>

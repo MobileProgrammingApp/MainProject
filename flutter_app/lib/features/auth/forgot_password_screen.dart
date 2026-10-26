@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api_service.dart';
 import '../../core/app_theme.dart';
+import '../../core/widgets/page_header.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -49,86 +50,68 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppStyles.backgroundColor,
-      appBar: AppBar(
-        title: const Text("Şifremi Unuttum"),
-        backgroundColor: AppStyles.backgroundColor,
+      appBar: const PageHeader(
+        icon: Icons.lock_reset_rounded,
+        title: "Şifremi unuttum",
+        subtitle: "Sıfırlama bağlantısı e-postana gelir",
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(30.0),
-        child: _sent
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.mark_email_read_outlined,
-                      size: 64,
-                      color: AppStyles.primaryColor,
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      "E-posta adresiniz kayıtlıysa, şifre sıfırlama bağlantısını gönderdik. Gelen kutunuzu (ve spam klasörünü) kontrol edin.",
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 30),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppStyles.primaryColor,
-                        minimumSize: const Size(double.infinity, 55),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                      ),
-                      child: const Text(
-                        "Giriş Ekranına Dön",
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Hesabınıza kayıtlı e-posta adresini girin, size şifre sıfırlama bağlantısı gönderelim.",
-                  ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      hintText: 'E-posta adresi',
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : ElevatedButton(
-                          onPressed: _submit,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppStyles.primaryColor,
-                            minimumSize: const Size(double.infinity, 55),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
-                            ),
-                          ),
-                          child: const Text(
-                            "Sıfırlama Bağlantısı Gönder",
-                            style: TextStyle(color: Colors.white),
-                          ),
-                        ),
-                ],
-              ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        children: _sent ? _buildSent() : _buildForm(),
       ),
     );
+  }
+
+  List<Widget> _buildForm() {
+    return [
+      const Text(
+        "Ev hesabına kayıtlı e-posta adresini gir, şifreni yenilemen için bir bağlantı gönderelim.",
+        style: TextStyle(color: AppStyles.textColor, fontSize: 15),
+      ),
+      const SizedBox(height: 20),
+      TextField(
+        controller: _emailController,
+        keyboardType: TextInputType.emailAddress,
+        autofocus: true,
+        onSubmitted: (_) => _submit(),
+        decoration: const InputDecoration(hintText: "E-posta adresi", prefixIcon: Icon(Icons.email_outlined)),
+      ),
+      const SizedBox(height: 24),
+      FilledButton(
+        onPressed: _isLoading ? null : _submit,
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+        child: _isLoading
+            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+            : const Text("Bağlantı gönder", style: TextStyle(fontSize: 16)),
+      ),
+    ];
+  }
+
+  List<Widget> _buildSent() {
+    return [
+      const SizedBox(height: 32),
+      Center(
+        child: Container(
+          width: 96,
+          height: 96,
+          decoration: const BoxDecoration(color: AppStyles.successSoft, shape: BoxShape.circle),
+          child: const Icon(Icons.mark_email_read_outlined, size: 44, color: AppStyles.successColor),
+        ),
+      ),
+      const SizedBox(height: 20),
+      const Text("E-postanı kontrol et", textAlign: TextAlign.center, style: AppStyles.listTileTitle),
+      const SizedBox(height: 6),
+      const Text(
+        "Adres kayıtlıysa şifre sıfırlama bağlantısını gönderdik. Birkaç dakika içinde gelmezse spam klasörüne de bak.",
+        textAlign: TextAlign.center,
+        style: AppStyles.listTileSubtitle,
+      ),
+      const SizedBox(height: 28),
+      FilledButton(
+        onPressed: () => Navigator.pop(context),
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+        child: const Text("Giriş ekranına dön", style: TextStyle(fontSize: 16)),
+      ),
+    ];
   }
 }

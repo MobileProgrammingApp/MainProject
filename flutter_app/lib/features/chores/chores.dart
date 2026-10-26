@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../core/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/api_service.dart';
+import '../../core/app_theme.dart';
+import '../../core/widgets/page_header.dart';
+import '../home/manage_home_screen.dart';
 
 class ChoresScreen extends StatefulWidget {
   const ChoresScreen({super.key});
@@ -13,399 +16,326 @@ class _ChoresScreenState extends State<ChoresScreen> {
   // ==========================================
   // 🛑 BACKEND DEĞİŞKENLERİ
   // ==========================================
-  List<Map<String, String>> _pendingChores = [];
-  List<Map<String, String>> _completedChores = [];
-  
-  int? currentUserId;
-  List<dynamic> _houseMembers = []; 
-  bool _isLoading = true; // Yükleniyor durumu eklendi
+  List<_Chore> _chores = [];
+  List<dynamic> _houseMembers = [];
+  int? _houseId;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // didChangeDependencies içinde çağrılacak
-  }
-
-  // Sayfa her ekrana geldiğinde verileri yenile
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _loadUserAndData(); 
+    // Sekmeye her geçişte sayfa yeniden kurulur (AppScaffold), veri burada çekilir.
+    _loadData();
   }
 
   // ==========================================
   // 🛑 BACKEND FONKSİYONLARI
   // ==========================================
-  
-  Future<void> _loadUserAndData() async {
+
+  Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    
-    // 1. DÜZELTME: Hafızayı tazele
-    await prefs.reload();
-
-    // 2. DÜZELTME: Eski verileri temizle ve yükleniyor moduna geç
-    if (mounted) {
-      setState(() {
-        _pendingChores.clear();
-        _completedChores.clear();
-        _houseMembers.clear();
-        _isLoading = true; // Yükleniyor...
-        currentUserId = prefs.getInt('saved_house_id');
-      });
+    _houseId = prefs.getInt('saved_house_id');
+    if (_houseId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
     }
-
-    if (currentUserId != null) {
-      // Sırasıyla verileri çek
-      await _fetchHouseMembers(); 
-      await _fetchChores();
-    } else {
-      // ID yoksa yüklemeyi bitir
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+    await Future.wait([_fetchHouseMembers(), _fetchChores()]);
   }
 
   Future<void> _fetchHouseMembers() async {
-    if (currentUserId == null) return;
-    final members = await ApiService.getFamilyMembers(currentUserId!);
-    if (mounted) {
-      setState(() {
-        _houseMembers = members;
-      });
-    }
+    final members = await ApiService.getFamilyMembers(_houseId!);
+    if (mounted) setState(() => _houseMembers = members);
   }
 
   Future<void> _fetchChores() async {
-    if (currentUserId == null) return;
-
-    // ApiService.getChores fonksiyonuna ID göndermeliyiz (Backend düzeltmesiyle uyumlu olması için)
-    // Eğer ApiService'deki getChores parametre almıyorsa, orayı da güncellemen gerekebilir.
-    // Şimdilik varsayılan haliyle bırakıyorum ama ID filtresi önemli.
-    List data = await ApiService.getChores(currentUserId!); 
-    
-    if (mounted) {
-      setState(() {
-        _pendingChores = data
-            .where((c) {
-              var val = c['is_done'];
-              return val == 0 || val == "0" || val == false || val == "false" || val == null;
-            })
-            .map((c) => {
-                  'id': c['id'].toString(),
-                  'name': c['task_name'].toString(),
-                  'assigned': c['assigned_to_id'].toString(),
-                })
-            .toList();
-
-        _completedChores = data
-            .where((c) {
-               var val = c['is_done'];
-               return val == 1 || val == "1" || val == true || val == "true";
-            })
-            .map((c) => {
-                  'id': c['id'].toString(),
-                  'name': c['task_name'].toString(),
-                  'assigned': c['assigned_to_id'].toString(),
-                })
-            .toList();
-        
-        _isLoading = false; // Yükleme bitti
-      });
-    }
+    final data = await ApiService.getChores(_houseId!);
+    if (!mounted) return;
+    setState(() {
+      _chores = data
+          .map((c) => _Chore(
+                id: int.parse(c['id'].toString()),
+                name: c['task_name'].toString(),
+                assignedId: c['assigned_to_id'].toString(),
+                done: c['is_done'] == 1 || c['is_done'] == "1" || c['is_done'] == true,
+              ))
+          .toList();
+      _isLoading = false;
+    });
   }
 
-  Future<void> _addNewChore(String name, String assignedUserId) async {
-    if (currentUserId == null) return;
-    int assignId = int.parse(assignedUserId);
-    bool success = await ApiService.addChore(currentUserId!, assignId, name);
-
+  Future<void> _addChore(String name, String assignedId) async {
+    final success = await ApiService.addChore(_houseId!, int.parse(assignedId), name);
+    if (!mounted) return;
     if (success) {
-      await _fetchChores(); 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Görev eklendi")));
-      }
+      await _fetchChores();
+      _showMessage("Görev eklendi");
     } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Hata oluştu")),
-        );
-      }
+      _showMessage("Görev eklenemedi");
     }
   }
 
-  Future<void> _completeChore(Map<String, String> chore) async {
-    final success = await ApiService.completeChore(int.parse(chore['id']!));
+  Future<void> _complete(_Chore chore) async {
+    final success = await ApiService.completeChore(chore.id);
+    if (!mounted) return;
     if (success) {
-      _fetchChores();
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Görev tamamlanamadı")),
-      );
+      await _fetchChores();
+      _showMessage("Görev tamamlandı 🎉");
+    } else {
+      _showMessage("Görev tamamlanamadı");
     }
   }
 
-  Future<void> _deleteChore(String choreId) async {
-    bool success = await ApiService.deleteChore(int.parse(choreId));
-    if (success) {
-      _fetchChores();
-      if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Görev silindi")));
-      }
+  Future<void> _delete(_Chore chore) async {
+    // Kaydırarak silinen öğe hemen listeden çıkmalı (Dismissible bunu bekler)
+    setState(() => _chores.remove(chore));
+    final success = await ApiService.deleteChore(chore.id);
+    if (!success && mounted) {
+      _showMessage("Görev silinemedi");
+      await _fetchChores();
     }
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  String _memberName(String id) {
+    final member = _houseMembers.firstWhere((m) => m['id'].toString() == id, orElse: () => null);
+    return member == null ? "Silinmiş kişi" : member['name'].toString();
   }
 
   // ==========================================
   // 🎨 TASARIM ALANI
   // ==========================================
 
-  void _showAddTaskModal() async {
-    await _fetchHouseMembers();
-    if (!mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: AddChoreForm(
-            onAddChore: _addNewChore,
-            members: _houseMembers, 
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final pending = _chores.where((c) => !c.done).toList();
+    final done = _chores.where((c) => c.done).toList();
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('🏡 Ev İşleri Panosu'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: Center(
-              child: Chip(
-                avatar: const Icon(Icons.star, color: Colors.amber, size: 16),
-                label: Text('${_completedChores.length}/${_pendingChores.length + _completedChores.length} Görev', style: const TextStyle(fontSize: 12)),
-                backgroundColor: Colors.amber.shade50,
-              ),
-            ),
-          ),
-        ],
+      appBar: PageHeader(
+        icon: Icons.task_alt_rounded,
+        title: "Ev işleri",
+        subtitle: _isLoading
+            ? null
+            : (pending.isEmpty ? "Bekleyen görev yok" : "${pending.length} görev bekliyor"),
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: "btn_add_chore", 
-        onPressed: _showAddTaskModal, 
-        child: const Icon(Icons.add),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: "btn_add_chore",
+        onPressed: _showAddSheet,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text("Görev ekle"),
       ),
-      // Yükleniyor kontrolü eklendi
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: _loadUserAndData, // Aşağı çekince yenile
-              child: ListView(
-                padding: const EdgeInsets.all(16.0),
-                children: <Widget>[
-                  Text(
-                    'Şu Anda Bekleyen Görevler',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 10),
-                  if (_pendingChores.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text("Bekleyen görev yok!", style: TextStyle(color: Colors.grey)),
+              onRefresh: _loadData,
+              child: _chores.isEmpty
+                  ? const EmptyState(
+                      icon: Icons.task_alt_rounded,
+                      title: "Henüz görev yok",
+                      message: "Ev işlerini paylaştırmak için\naşağıdan ilk görevi ekle.",
+                    )
+                  : ListView(
+                      // Alttaki "Görev ekle" butonu son satırı kapatmasın
+                      padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
+                      children: [
+                        SectionHeader(title: "Bekleyenler", count: pending.length),
+                        if (pending.isEmpty)
+                          _buildAllDoneCard()
+                        else
+                          GroupedCard(dividerIndent: 72, children: pending.map(_buildPendingRow).toList()),
+                        if (done.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          SectionHeader(title: "Tamamlananlar", count: done.length),
+                          GroupedCard(dividerIndent: 72, children: done.map(_buildDoneRow).toList()),
+                        ],
+                      ],
                     ),
-                  ..._pendingChores.map((chore) => _buildPendingChoreCard(chore, context)),
-
-                  const SizedBox(height: 30),
-
-                  Text(
-                    'Bugün Tamamlananlar',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 10),
-                  if (_completedChores.isEmpty && _pendingChores.isNotEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text("Henüz bir görev tamamlanmadı.", style: TextStyle(color: Colors.grey)),
-                    ),
-                  ..._completedChores.map((chore) => _buildCompletedChoreCard(chore)),
-                ],
-              ),
             ),
     );
   }
 
-  // --- KART TASARIMLARI (AYNI KALDI) ---
-  Widget _buildPendingChoreCard(Map<String, String> chore, BuildContext context) {
-    String assignedName = chore['assigned']!; 
-    
-    var member = _houseMembers.firstWhere(
-      (m) => m['id'].toString() == chore['assigned'], 
-      orElse: () => null 
+  Widget _buildAllDoneCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppStyles.cardDecoration,
+      child: const Row(
+        children: [
+          Icon(Icons.celebration_rounded, color: AppStyles.successColor),
+          SizedBox(width: 12),
+          Expanded(child: Text("Bütün işler bitti, eline sağlık!", style: AppStyles.listTileTitle)),
+        ],
+      ),
     );
+  }
 
-    if (member != null) {
-      assignedName = member['name'];
-    } else {
-      assignedName = "Silinmiş Kişi"; 
-    }
+  Widget _swipeToDelete(_Chore chore, Widget child) {
+    return Dismissible(
+      key: ValueKey(chore.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        color: AppStyles.deleteColor,
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+      ),
+      onDismissed: (_) => _delete(chore),
+      child: child,
+    );
+  }
 
-    return Card(
-      elevation: 2,
-      child: ListTile(
+  Widget _buildPendingRow(_Chore chore) {
+    final name = _memberName(chore.assignedId);
+    return _swipeToDelete(
+      chore,
+      ListTile(
+        contentPadding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
         leading: CircleAvatar(
-          child: Text(assignedName.isNotEmpty ? assignedName[0].toUpperCase() : "?"),
+          backgroundColor: AppStyles.primarySoft,
+          foregroundColor: AppStyles.primaryColor,
+          child: Text(name.characters.first.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
-        title: Text(
-          chore['name']!,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text('Atanan: $assignedName'),
+        title: Text(chore.name, style: AppStyles.listTileTitle),
+        subtitle: Text(name),
         trailing: IconButton(
-          icon: const Icon(Icons.check_circle_outline, color: Colors.green),
-          onPressed: () {
-            _completeChore(chore); 
-          },
+          tooltip: "Tamamlandı",
+          icon: const Icon(Icons.check_circle_outline_rounded, color: AppStyles.successColor, size: 28),
+          onPressed: () => _complete(chore),
         ),
       ),
     );
   }
 
-  Widget _buildCompletedChoreCard(Map<String, String> chore) {
-    String assignedName = chore['assigned']!;
-    
-    var member = _houseMembers.firstWhere(
-      (m) => m['id'].toString() == chore['assigned'], 
-      orElse: () => null
-    );
-
-    if (member != null) {
-      assignedName = member['name'];
-    } else {
-      assignedName = "Silinmiş Kişi";
-    }
-
-    return Card(
-      color: Colors.grey.shade100,
-      elevation: 0,
-      child: ListTile(
-        leading: const Icon(Icons.check_circle, color: Colors.grey),
-        title: Text(
-          chore['name']!,
-          style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey),
+  Widget _buildDoneRow(_Chore chore) {
+    return _swipeToDelete(
+      chore,
+      ListTile(
+        contentPadding: const EdgeInsets.fromLTRB(16, 2, 8, 2),
+        leading: const CircleAvatar(
+          backgroundColor: AppStyles.successSoft,
+          foregroundColor: AppStyles.successColor,
+          child: Icon(Icons.check_rounded),
         ),
-        subtitle: Text('Yapan: $assignedName', style: const TextStyle(color: Colors.grey)),
+        title: Text(
+          chore.name,
+          style: const TextStyle(
+            decoration: TextDecoration.lineThrough,
+            color: AppStyles.mutedTextColor,
+          ),
+        ),
+        subtitle: Text("Yapan: ${_memberName(chore.assignedId)}"),
         trailing: IconButton(
-          icon: const Icon(Icons.delete_outline, color: Colors.red),
-          onPressed: () {
-            _deleteChore(chore['id']!); 
-          },
+          tooltip: "Sil",
+          icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
+          onPressed: () => _delete(chore),
         ),
       ),
+    );
+  }
+
+  Future<void> _showAddSheet() async {
+    await _fetchHouseMembers();
+    if (!mounted) return;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _AddChoreSheet(members: _houseMembers, onAdd: _addChore),
     );
   }
 }
 
-// --- FORM WIDGET (AYNI KALDI) ---
-class AddChoreForm extends StatefulWidget {
-  final Function(String name, String assignedUserId) onAddChore;
-  final List<dynamic> members; 
+class _Chore {
+  final int id;
+  final String name;
+  final String assignedId;
+  final bool done;
+  const _Chore({required this.id, required this.name, required this.assignedId, required this.done});
+}
 
-  const AddChoreForm({
-    super.key,
-    required this.onAddChore,
-    required this.members,
-  });
+class _AddChoreSheet extends StatefulWidget {
+  final List<dynamic> members;
+  final Future<void> Function(String name, String assignedId) onAdd;
+
+  const _AddChoreSheet({required this.members, required this.onAdd});
 
   @override
-  State<AddChoreForm> createState() => _AddChoreFormState();
+  State<_AddChoreSheet> createState() => _AddChoreSheetState();
 }
 
-class _AddChoreFormState extends State<AddChoreForm> {
-  String _choreName = '';
-  String? _assignedUserId; 
+class _AddChoreSheetState extends State<_AddChoreSheet> {
+  final _nameController = TextEditingController();
+  String? _assignedId;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _nameController.text.trim();
+    if (name.isEmpty || _assignedId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Görevi yazıp kime atanacağını seçin")),
+      );
+      return;
+    }
+    Navigator.pop(context);
+    widget.onAdd(name, _assignedId!);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      height: MediaQuery.of(context).size.height * 0.60,
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text(
-            '➕ Yeni Ev İşi Ekle',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              fontSize: 24,
-            ),
-          ),
-          const SizedBox(height: 20),
-
+        children: [
+          const Text("Yeni görev", style: AppStyles.popupHeader),
+          const SizedBox(height: 16),
           TextField(
+            controller: _nameController,
             autofocus: true,
+            maxLength: 255,
+            textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(
-              labelText: 'Ev İşinin Adı (Örn: Çöpleri Çıkar)',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.cleaning_services),
+              hintText: "Ne yapılacak? (örn: Çöpleri çıkar)",
+              prefixIcon: Icon(Icons.cleaning_services_outlined),
+              counterText: "",
             ),
-            onChanged: (value) {
-              _choreName = value;
-            },
           ),
-          const SizedBox(height: 20),
-
-          DropdownButtonFormField<String>(
-            decoration: const InputDecoration(
-              labelText: 'Kime Atansın?',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.person),
-            ),
-            value: _assignedUserId,
-            items: widget.members.map<DropdownMenuItem<String>>((dynamic member) {
-              return DropdownMenuItem<String>(
-                value: member['id'].toString(), 
-                child: Text(member['name']),    
-              );
-            }).toList(),
-            onChanged: (String? newValue) {
-              setState(() {
-                _assignedUserId = newValue;
-              });
-            },
-            hint: widget.members.isEmpty 
-              ? const Text("Kişi bulunamadı") 
-              : const Text("Kişi Seçiniz"),
-          ),
-          const SizedBox(height: 30),
-
-          ElevatedButton.icon(
-            icon: const Icon(Icons.save),
-            label: const Text('Görevi Kaydet', style: TextStyle(fontSize: 16)),
-            onPressed: () {
-              if (_choreName.isNotEmpty && _assignedUserId != null) {
-                widget.onAddChore(_choreName, _assignedUserId!); 
-                Navigator.pop(context);
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Lütfen tüm alanları doldurun")),
+          const SizedBox(height: 18),
+          const Text("Kime atansın?", style: AppStyles.listTileSubtitle),
+          const SizedBox(height: 8),
+          if (widget.members.isEmpty)
+            OutlinedButton.icon(
+              onPressed: () {
+                final navigator = Navigator.of(context);
+                navigator.pop();
+                navigator.push(MaterialPageRoute(builder: (_) => const ManageHomeScreen()));
+              },
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+              label: const Text("Önce eve bir kişi ekle"),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: widget.members.map<Widget>((m) {
+                final id = m['id'].toString();
+                return ChoiceChip(
+                  label: Text(m['name'].toString()),
+                  selected: _assignedId == id,
+                  onSelected: (_) => setState(() => _assignedId = id),
                 );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 15),
+              }).toList(),
             ),
-          ),
+          const SizedBox(height: 24),
+          FilledButton(onPressed: _submit, child: const Text("Görevi ekle")),
         ],
       ),
     );

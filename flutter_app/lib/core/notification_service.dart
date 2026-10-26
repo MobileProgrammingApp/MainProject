@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -46,12 +47,12 @@ class NotificationService {
       }
     });
 
-    if (await _isEnabled()) {
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token != null) {
-        await _registerToken(token);
-      }
-    }
+    // Cihaz token'ını sunucuya kaydet. Ağ isteği olduğu için beklenmez:
+    // yavaş internette açılış ekranında takılı kalınmasın.
+    unawaited(syncToken().catchError((Object e) {
+      debugPrint("FCM token kaydı başarısız: $e");
+      return false;
+    }));
   }
 
   static Future<bool> _isEnabled() async {

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../core/app_theme.dart';
-import '../../core/api_service.dart'; 
+import '../../core/api_service.dart';
+import '../../core/app_theme.dart';
+import '../../core/widgets/page_header.dart';
 
 class HomeInfoScreen extends StatefulWidget {
   const HomeInfoScreen({super.key});
@@ -11,466 +12,358 @@ class HomeInfoScreen extends StatefulWidget {
   State<HomeInfoScreen> createState() => _HomeInfoScreenState();
 }
 
-class _HomeInfoScreenState extends State<HomeInfoScreen>
-    with SingleTickerProviderStateMixin {
-  
-  late TabController _tabController;
-  int _currentTabIndex = 0;
-  
-  // ==========================================
-  // 🛑 BACKEND DEĞİŞKENLERİ (DOKUNMA)
-  // Bu değişkenler verileri hafızada tutar.
-  // ==========================================
-  int? currentUserId;
-  List<dynamic> importantInfo = [];
-  List<dynamic> inventoryItems = [];
-  bool isLoading = true;
+class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProviderStateMixin {
+  late final TabController _tabController = TabController(length: 2, vsync: this)
+    ..addListener(() => setState(() {}));
 
-  // Form Kontrolcüleri (Veri girişi için teknik araçlar)
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _valueController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _locationController = TextEditingController();
+  // ==========================================
+  // 🛑 BACKEND DEĞİŞKENLERİ
+  // ==========================================
+  int? _houseId;
+  List<dynamic> _infos = [];
+  List<dynamic> _inventory = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      setState(() {
-        _currentTabIndex = _tabController.index;
-      });
-    });
-    _loadData(); 
+    _loadData();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _titleController.dispose();
-    _valueController.dispose();
-    _nameController.dispose();
-    _locationController.dispose();
     super.dispose();
   }
 
   // ==========================================
-  // 🛑 BACKEND FONKSİYONLARI (DOKUNMA)
-  // Sunucuyla konuşan, kayıt yapan ve silen kodlar.
-  // Tasarımla ilgisi yoktur.
+  // 🛑 BACKEND FONKSİYONLARI
   // ==========================================
 
-  // 1. Verileri Çek
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
+    _houseId = prefs.getInt('saved_house_id');
+    if (_houseId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    final data = await ApiService.getHomeDetails(_houseId!);
+    if (!mounted) return;
     setState(() {
-      currentUserId = prefs.getInt('saved_house_id');
+      if (data['status'] == 'success') {
+        _infos = data['infos'];
+        _inventory = data['inventory'];
+      }
+      _isLoading = false;
     });
+  }
 
-    if (currentUserId != null) {
-      final data = await ApiService.getHomeDetails(currentUserId!);
-      setState(() {
-        if (data['status'] == 'success') {
-          importantInfo = data['infos'];
-          inventoryItems = data['inventory'];
-        }
-        isLoading = false;
-      });
+  /// Ekleme formundan çağrılır; başarılıysa true döner (form kapanır).
+  Future<bool> _add(bool isInfo, String first, String second) async {
+    final success = isInfo
+        ? await ApiService.addInfo(_houseId!, first, second)
+        : await ApiService.addInventory(_houseId!, first, second);
+    if (!mounted) return success;
+
+    if (success) {
+      await _loadData();
     } else {
-      setState(() => isLoading = false);
+      _showMessage("Kaydedilemedi, lütfen tekrar deneyin");
     }
+    return success;
   }
 
-  // 2. Yeni Bilgi Ekle (API)
-  Future<void> _addNewInfo() async {
-    if (currentUserId == null) return;
-    if (_titleController.text.trim().isEmpty || _valueController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Lütfen başlık ve değeri doldurun")),
-      );
-      return;
-    }
-    bool success = await ApiService.addInfo(
-      currentUserId!,
-      _titleController.text,
-      _valueController.text
-    );
-    if (success) {
-      _loadData();
-      if(mounted) Navigator.pop(context);
-    }
-  }
-
-  // 3. Yeni Eşya Ekle (API)
-  Future<void> _addNewInventory() async {
-    if (currentUserId == null) return;
-    if (_nameController.text.trim().isEmpty || _locationController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Lütfen eşya adı ve yerini doldurun")),
-      );
-      return;
-    }
-    bool success = await ApiService.addInventory(
-      currentUserId!,
-      _nameController.text,
-      _locationController.text
-    );
-    if (success) {
-      _loadData();
-      if(mounted) Navigator.pop(context);
-    }
-  }
-
-  // 4. Silme İşlemi (API)
-  Future<void> _handleDeleteItem(BuildContext context, int id, String type) async {
-    // Onay Kutusu (Tasarım kısmı aşağıda ama mantığı burada)
-    bool? confirm = await showDialog<bool>(
+  Future<void> _delete(int id, bool isInfo) async {
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Silme Onayı'),
-          content: const Text("Bu öğeyi silmek istediğinizden emin misiniz?"),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('İptal', style: TextStyle(color: Colors.grey)),
-              onPressed: () => Navigator.of(context).pop(false),
-            ),
-            TextButton(
-              child: const Text('Sil', style: TextStyle(color: Colors.red)),
-              onPressed: () => Navigator.of(context).pop(true),
-            ),
-          ],
-        );
-      },
+      builder: (ctx) => AlertDialog(
+        title: const Text('Silinsin mi?'),
+        content: const Text("Bu kayıt evdeki herkes için silinecek."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('İptal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppStyles.deleteColor),
+            child: const Text('Sil'),
+          ),
+        ],
+      ),
     );
+    if (confirmed != true) return;
 
-    if (confirm == true) {
-      bool success = false;
-      if (type == 'info') {
-        success = await ApiService.deleteInfo(id);
-      } else {
-        success = await ApiService.deleteInventory(id);
-      }
-
-      if (success) {
-        _loadData();
-        if(mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Silindi")));
-        }
-      }
+    final success = isInfo ? await ApiService.deleteInfo(id) : await ApiService.deleteInventory(id);
+    if (!mounted) return;
+    if (success) {
+      await _loadData();
+      _showMessage("Silindi");
+    } else {
+      _showMessage("Silinemedi");
     }
   }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
   // ==========================================
-  // 🏁 BACKEND BİTİŞ
+  // 🎨 TASARIM ALANI
   // ==========================================
 
-
-  // ==========================================
-  // 🎨 TASARIM ALANI BAŞLANGIÇ
-  // Buradan aşağısı ekran görüntüsüyle ilgilidir.
-  // Renkleri, buton şekillerini, yazıları değiştirebilirsin.
-  // ==========================================
+  bool get _onInfoTab => _tabController.index == 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppStyles.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Ev Bilgileri', style: AppStyles.appBarTitle),
-        backgroundColor: AppStyles.backgroundColor,
-        elevation: 0.0,
-        automaticallyImplyLeading: false,
+      appBar: PageHeader(
+        icon: Icons.home_rounded,
+        title: "Ev bilgileri",
+        subtitle: _isLoading ? null : "${_infos.length} bilgi • ${_inventory.length} eşya",
         bottom: TabBar(
           controller: _tabController,
-          indicatorColor: AppStyles.accentColor,
-          labelColor: AppStyles.primaryColor,
-          unselectedLabelColor: Colors.grey.shade500,
-          labelStyle: AppStyles.tabLabelStyle,
+          indicatorColor: Colors.white,
+          indicatorWeight: 3,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white.withValues(alpha: 0.7),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w700),
+          dividerColor: Colors.transparent,
           tabs: const [
-            Tab(icon: Icon(Icons.info_outline), text: 'Önemli Bilgiler'),
-            Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Eşya Envanteri'),
+            Tab(height: 48, text: 'Önemli bilgiler'),
+            Tab(height: 48, text: 'Eşyaların yeri'),
           ],
         ),
       ),
-      body: isLoading 
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: "btn_add_info_screen",
+        onPressed: () => _showAddSheet(isInfo: _onInfoTab),
+        icon: const Icon(Icons.add_rounded),
+        label: Text(_onInfoTab ? "Bilgi ekle" : "Eşya ekle"),
+      ),
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : TabBarView(
-            controller: _tabController,
-            children: [
-              // SEKME 1: BİLGİLER LİSTESİ
-              _ImportantInfoTab(
-                infoList: importantInfo, // Backend verisi gönderiliyor
-                onItemDelete: (id) => _handleDeleteItem(context, id, 'info'), // Silme fonksiyonu
+              controller: _tabController,
+              children: [
+                RefreshIndicator(onRefresh: _loadData, child: _buildInfoList()),
+                RefreshIndicator(onRefresh: _loadData, child: _buildInventoryList()),
+              ],
+            ),
+    );
+  }
+
+  // Başlıktaki kelimeye göre ikon seçer
+  IconData _iconForTitle(String title) {
+    final t = title.toLowerCase();
+    if (t.contains('wifi') || t.contains('wi-fi') || t.contains('internet') || t.contains('modem')) return Icons.wifi_rounded;
+    if (t.contains('tel') || t.contains('numara') || t.contains('iletişim')) return Icons.phone_rounded;
+    if (t.contains('şifre') || t.contains('kod') || t.contains('pin')) return Icons.password_rounded;
+    if (t.contains('su ') || t == 'su' || t.contains('vana')) return Icons.water_drop_rounded;
+    if (t.contains('elektrik') || t.contains('sigorta')) return Icons.bolt_rounded;
+    if (t.contains('doğalgaz') || t.contains('kombi')) return Icons.local_fire_department_rounded;
+    return Icons.info_outline_rounded;
+  }
+
+  Widget _buildInfoList() {
+    if (_infos.isEmpty) {
+      return const EmptyState(
+        icon: Icons.info_outline_rounded,
+        title: "Henüz bilgi yok",
+        message: "Wi-Fi şifresi, kapı kodu, önemli numaralar…\nHerkesin bilmesi gerekenleri buraya ekle.",
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
+      children: [
+        GroupedCard(
+          dividerIndent: 72,
+          children: _infos.map((info) {
+            final value = info['value'].toString();
+            return ListTile(
+              contentPadding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
+              leading: _iconBadge(_iconForTitle(info['title'].toString()), AppStyles.primaryColor, AppStyles.primarySoft),
+              title: Text(info['title'].toString(), style: AppStyles.listTileSubtitle),
+              subtitle: Text(value, style: AppStyles.listTileTitle),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: "Kopyala",
+                    icon: const Icon(Icons.copy_rounded, size: 20, color: AppStyles.primaryColor),
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: value));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Kopyalandı'), duration: Duration(seconds: 1)),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    tooltip: "Sil",
+                    icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
+                    onPressed: () => _delete(int.parse(info['id'].toString()), true),
+                  ),
+                ],
               ),
-              // SEKME 2: ENVANTER LİSTESİ
-              _InventoryTab(
-                itemList: inventoryItems, // Backend verisi gönderiliyor
-                onItemDelete: (id) => _handleDeleteItem(context, id, 'inventory'), // Silme fonksiyonu
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInventoryList() {
+    if (_inventory.isEmpty) {
+      return const EmptyState(
+        icon: Icons.inventory_2_outlined,
+        title: "Henüz eşya yok",
+        message: "Pasaportlar, yedek anahtar, faturalar…\nNerede olduklarını unutmamak için ekle.",
+        color: AppStyles.accentColor,
+        softColor: AppStyles.accentSoft,
+      );
+    }
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
+      children: [
+        GroupedCard(
+          dividerIndent: 72,
+          children: _inventory.map((item) {
+            return ListTile(
+              contentPadding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
+              leading: _iconBadge(Icons.inventory_2_rounded, AppStyles.accentColor, AppStyles.accentSoft),
+              title: Text(item['item_name'].toString(), style: AppStyles.listTileTitle),
+              subtitle: Row(
+                children: [
+                  const Icon(Icons.place_outlined, size: 15, color: AppStyles.mutedTextColor),
+                  const SizedBox(width: 4),
+                  Expanded(child: Text(item['location'].toString())),
+                ],
               ),
-            ],
-          ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: "btn_add_info_screen",
-        onPressed: () {
-          if (_currentTabIndex == 0) {
-            _showAddInfoBottomSheet(context);
-          } else {
-            _showAddItemBottomSheet(context);
-          }
-        },
-        backgroundColor: AppStyles.accentColor,
-        foregroundColor: Colors.white,
-        tooltip: 'Yeni Ekle',
-        child: const Icon(Icons.add),
+              trailing: IconButton(
+                tooltip: "Sil",
+                icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
+                onPressed: () => _delete(int.parse(item['id'].toString()), false),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _iconBadge(IconData icon, Color color, Color soft) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(color: soft, borderRadius: BorderRadius.circular(12)),
+      child: Icon(icon, color: color, size: 22),
+    );
+  }
+
+  void _showAddSheet({required bool isInfo}) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _AddEntrySheet(
+        title: isInfo ? "Yeni bilgi" : "Yeni eşya",
+        firstHint: isInfo ? "Başlık (örn: Wi-Fi şifresi)" : "Eşya (örn: Pasaportlar)",
+        firstIcon: isInfo ? Icons.label_outline_rounded : Icons.inventory_2_outlined,
+        firstMax: 100,
+        secondHint: isInfo ? "Bilgi (örn: ev12345)" : "Yeri (örn: Kasanın içi)",
+        secondIcon: isInfo ? Icons.notes_rounded : Icons.place_outlined,
+        secondMax: 255,
+        onSave: (first, second) => _add(isInfo, first, second),
       ),
-    );
-  }
-
-  // --- POP-UP PENCERESİ TASARIMI (BİLGİ EKLEME) ---
-  void _showAddInfoBottomSheet(BuildContext context) {
-    _titleController.clear();
-    _valueController.clear();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.0))),
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              top: 20, left: 20, right: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Yeni Önemli Bilgi Ekle', style: AppStyles.popupHeader),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _titleController,
-                decoration: InputDecoration(
-                  labelText: 'Başlık (Örn: Wi-Fi)',
-                  border: AppStyles.formFieldBorder,
-                  focusedBorder: AppStyles.formFieldFocusedBorder,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _valueController,
-                decoration: InputDecoration(
-                  labelText: 'Değer (Örn: sifre123)',
-                  border: AppStyles.formFieldBorder,
-                  focusedBorder: AppStyles.formFieldFocusedBorder,
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: AppStyles.primaryColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: _addNewInfo, // Backend fonksiyonunu çağırır
-                child: const Text('Kaydet'),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // --- POP-UP PENCERESİ TASARIMI (EŞYA EKLEME) ---
-  void _showAddItemBottomSheet(BuildContext context) {
-    _nameController.clear();
-    _locationController.clear();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20.0))),
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              top: 20, left: 20, right: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Yeni Eşya Ekle', style: AppStyles.popupHeader),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Eşya Adı (Örn: Pasaportlar)',
-                  border: AppStyles.formFieldBorder,
-                  focusedBorder: AppStyles.formFieldFocusedBorder,
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _locationController,
-                decoration: InputDecoration(
-                  labelText: 'Yeri (Örn: Kasa içi)',
-                  border: AppStyles.formFieldBorder,
-                  focusedBorder: AppStyles.formFieldFocusedBorder,
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: AppStyles.primaryColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: _addNewInventory, // Backend fonksiyonunu çağırır
-                child: const Text('Kaydet'),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        );
-      },
     );
   }
 }
 
-// -----------------------------------------------------------------
-// 🎨 YARDIMCI WIDGETLAR (Tasarım Bileşenleri)
-// -----------------------------------------------------------------
+/// İki alanlı ekleme formu (bilgi: başlık + değer, eşya: ad + yer)
+class _AddEntrySheet extends StatefulWidget {
+  final String title;
+  final String firstHint;
+  final IconData firstIcon;
+  final int firstMax;
+  final String secondHint;
+  final IconData secondIcon;
+  final int secondMax;
+  final Future<bool> Function(String first, String second) onSave;
 
-class _EmptyStateWidget extends StatelessWidget {
-  final String message;
-  final IconData icon;
-  const _EmptyStateWidget({required this.message, required this.icon});
+  const _AddEntrySheet({
+    required this.title,
+    required this.firstHint,
+    required this.firstIcon,
+    required this.firstMax,
+    required this.secondHint,
+    required this.secondIcon,
+    required this.secondMax,
+    required this.onSave,
+  });
+
+  @override
+  State<_AddEntrySheet> createState() => _AddEntrySheetState();
+}
+
+class _AddEntrySheetState extends State<_AddEntrySheet> {
+  final _first = TextEditingController();
+  final _second = TextEditingController();
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _first.dispose();
+    _second.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final first = _first.text.trim();
+    final second = _second.text.trim();
+    if (first.isEmpty || second.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Lütfen iki alanı da doldurun")));
+      return;
+    }
+    setState(() => _saving = true);
+    final ok = await widget.onSave(first, second);
+    if (!mounted) return;
+    if (ok) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _saving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(icon, size: 80, color: Colors.grey.shade300),
+          Text(widget.title, style: AppStyles.popupHeader),
           const SizedBox(height: 16),
-          Text(message, textAlign: TextAlign.center, style: TextStyle(fontSize: 18, color: Colors.grey.shade500)),
+          TextField(
+            controller: _first,
+            autofocus: true,
+            maxLength: widget.firstMax,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(hintText: widget.firstHint, prefixIcon: Icon(widget.firstIcon), counterText: ""),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _second,
+            maxLength: widget.secondMax,
+            decoration: InputDecoration(hintText: widget.secondHint, prefixIcon: Icon(widget.secondIcon), counterText: ""),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: _saving ? null : _submit,
+            child: _saving
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text("Kaydet"),
+          ),
         ],
       ),
-    );
-  }
-}
-
-class _ImportantInfoTab extends StatelessWidget {
-  final List<dynamic> infoList;
-  final Function(int) onItemDelete;
-
-  const _ImportantInfoTab({required this.infoList, required this.onItemDelete});
-
-  // Burası tasarım mantığıdır. Kelimeye göre ikon seçer.
-  // Arkadaşın buraya yeni kelimeler ekleyebilir.
-  IconData _getIconForTitle(String title) {
-    title = title.toLowerCase();
-    if (title.contains('wifi') || title.contains('internet') || title.contains('modem')) return Icons.wifi;
-    if (title.contains('tel') || title.contains('numara') || title.contains('iletişim')) return Icons.phone;
-    if (title.contains('şifre') || title.contains('kod') || title.contains('pin')) return Icons.password;
-    if (title.contains('su') || title.contains('vana')) return Icons.water_drop;
-    if (title.contains('elektrik') || title.contains('sigorta')) return Icons.flash_on;
-    return Icons.info_outline;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (infoList.isEmpty) {
-      return const _EmptyStateWidget(message: 'Henüz bilgi eklenmemiş.\n(+) ile ekleyin.', icon: Icons.info_outline);
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.all(12.0),
-      itemCount: infoList.length,
-      itemBuilder: (context, index) {
-        final info = infoList[index];
-        final int id = int.parse(info['id'].toString());
-        
-        return _InfoTile(
-          icon: _getIconForTitle(info['title']),
-          title: info['title'],
-          value: info['value'],
-          onDelete: () => onItemDelete(id),
-        );
-      },
-    );
-  }
-}
-
-class _InfoTile extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String value;
-  final VoidCallback onDelete;
-
-  const _InfoTile({required this.icon, required this.title, required this.value, required this.onDelete});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(vertical: 6.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: Icon(icon, color: AppStyles.primaryColor),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(value),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.copy, size: 20, color: Colors.grey),
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: value));
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Kopyalandı'), duration: Duration(seconds: 1)));
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
-              onPressed: onDelete,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _InventoryTab extends StatelessWidget {
-  final List<dynamic> itemList;
-  final Function(int) onItemDelete;
-
-  const _InventoryTab({required this.itemList, required this.onItemDelete});
-
-  @override
-  Widget build(BuildContext context) {
-    if (itemList.isEmpty) {
-      return const _EmptyStateWidget(message: 'Henüz eşya eklenmemiş.\n(+) ile ekleyin.', icon: Icons.inventory_2_outlined);
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.all(12.0),
-      itemCount: itemList.length,
-      itemBuilder: (context, index) {
-        final item = itemList[index];
-        final int id = int.parse(item['id'].toString());
-
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(vertical: 6.0),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            leading: const Icon(Icons.inventory_2, color: Colors.orange),
-            title: Text(item['item_name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(item['location']),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
-              onPressed: () => onItemDelete(id),
-            ),
-          ),
-        );
-      },
     );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
+import '../../core/widgets/homepal_mark.dart';
 import '../../core/app_scaffold.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -73,50 +74,40 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.home_work_rounded,
-                size: 80,
-                color: AppStyles.primaryColor,
+              // Açılış animasyonunun bittiği kompozisyonla aynı amblem ve yazı
+              const BrandHero(tag: BrandHero.mark, child: HomePalMark(size: kBrandMarkSize)),
+              const BrandHero(tag: BrandHero.wordmark, child: HomePalWordmark()),
+              const SizedBox(height: 6),
+              const BrandHero(
+                tag: BrandHero.tagline,
+                child: Text("Evin ortak asistanı", style: AppStyles.listTileSubtitle),
               ),
-              const SizedBox(height: 20),
-              const Text("HomePal", style: AppStyles.appBarTitle),
-              const SizedBox(height: 40),
+              const SizedBox(height: 36),
 
               // E-Posta Kutusu
               TextField(
                 controller: _emailController,
-                decoration: InputDecoration(
-                  hintText: 'Ev Ortak Maili',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide.none,
-                  ),
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  hintText: 'Ev ortak e-postası',
+                  prefixIcon: Icon(Icons.email_outlined),
                 ),
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 12),
 
               // Şifre Kutusu
               TextField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _login(),
                 decoration: InputDecoration(
                   hintText: 'Şifre',
-                  filled: true,
-                  fillColor: Colors.white,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
-                    borderSide: BorderSide.none,
-                  ),
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
                   suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                    ),
-                    onPressed: () =>
-                        setState(() => _obscurePassword = !_obscurePassword),
+                    icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
               ),
@@ -129,32 +120,20 @@ class _LoginScreenState extends State<LoginScreen> {
                       builder: (context) => const ForgotPasswordScreen(),
                     ),
                   ),
-                  child: const Text(
-                    "Şifremi Unuttum?",
-                    style: TextStyle(color: AppStyles.primaryColor),
-                  ),
+                  child: const Text("Şifremi unuttum"),
                 ),
               ),
               const SizedBox(height: 10),
 
               // Giriş Butonu
-              _isLoading
-                  ? const CircularProgressIndicator()
-                  : ElevatedButton(
-                      onPressed:
-                          _login, // Butona basılınca Backend fonksiyonu çalışır
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppStyles.primaryColor,
-                        minimumSize: const Size(double.infinity, 55),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                      ),
-                      child: const Text(
-                        "Giriş Yap",
-                        style: TextStyle(color: Colors.white, fontSize: 16),
-                      ),
-                    ),
+              FilledButton(
+                onPressed: _isLoading ? null : _login,
+                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+                child: _isLoading
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                    : const Text("Giriş yap", style: TextStyle(fontSize: 16)),
+              ),
+              const SizedBox(height: 8),
 
               // Kayıt Ol Linki
               TextButton(
@@ -164,9 +143,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     builder: (context) => const RegisterScreen(),
                   ),
                 ),
-                child: const Text(
-                  "Henüz bir ev hesabınız yok mu? Kaydol",
-                  style: TextStyle(color: AppStyles.primaryColor),
+                child: const Text.rich(
+                  TextSpan(
+                    text: "Henüz bir ev hesabın yok mu? ",
+                    style: TextStyle(color: AppStyles.mutedTextColor),
+                    children: [
+                      TextSpan(text: "Yeni ev oluştur", style: TextStyle(color: AppStyles.primaryColor, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
                 ),
               ),
             ],

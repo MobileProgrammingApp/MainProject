@@ -52,10 +52,19 @@ dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.3
 
+# Uygulama ikonu = mağaza ikonundaki kart (Play Console'daki ikonla aynı görsel).
+# Yeniden üretmek için: dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
   ios: false
+  min_sdk_android: 24
+  # Android 7 için düz ikon
   image_path: "assets/icon/app_icon.png"
+  # Android 8+ uyarlanabilir ikon: kart, görünür alanın %90'ı olacak şekilde
+  # ic_foreground.png içinde önceden ölçeklendi; bu yüzden paket ek boşluk eklemesin
+  adaptive_icon_background: "#0D3154"
+  adaptive_icon_foreground: "assets/icon/ic_foreground.png"
+  adaptive_icon_foreground_inset: 0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

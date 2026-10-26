@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api_service.dart';
+import '../../core/app_theme.dart';
+import '../../core/widgets/page_header.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -93,84 +95,78 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // ==========================================
   // 🎨 TASARIM ALANI (FRONTEND)
-  // Kayıt ekranının görüntüsü buradadır.
-  // Renkleri, yazı tiplerini ve boşlukları buradan değiştirebilirsin.
   // ==========================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Yeni Ev Oluştur")),
-      body: Padding(
-        padding: const EdgeInsets.all(30.0),
-        child: SingleChildScrollView( 
-          child: Column(
-            children: [
-              const Text(
-                "Tüm aile üyeleri bu e-posta ve şifre ile giriş yapacak.", 
-                textAlign: TextAlign.center
-              ),
-              const SizedBox(height: 30),
-              
-              // Ev Adı Kutusu
-              _buildField("Ev Adı (Örn: Bizim Yuva)", _houseNameController),
-              const SizedBox(height: 15),
-              
-              // E-Posta Kutusu
-              _buildField("Ortak E-posta", _emailController),
-              const SizedBox(height: 15),
-              
-              // Şifre Kutusu
-              _buildField(
-                "Şifre",
-                _passwordController,
-                isPassword: true,
-                obscureText: _obscurePassword,
-                onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
-              ),
-              
-              const SizedBox(height: 30),
-              
-              // Kayıt Butonu (Logic burada bağlanıyor)
-              _isLoading 
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: _register, // Butona basılınca Backend fonksiyonu çalışır
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2C3E50), // Buton rengi
-                      minimumSize: const Size(double.infinity, 55),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    ),
-                    child: const Text("Kaydı Tamamla", style: TextStyle(color: Colors.white)),
-                  ),
-            ],
-          ),
-        ),
+      appBar: const PageHeader(
+        icon: Icons.add_home_rounded,
+        title: "Yeni ev oluştur",
+        subtitle: "Tüm ev halkı bu hesapla giriş yapar",
       ),
-    );
-  }
-
-  // Yardımcı Tasarım Parçası (Kutucukların şekli burada belirlenir)
-  Widget _buildField(
-    String hint,
-    TextEditingController controller, {
-    bool isPassword = false,
-    bool obscureText = false,
-    VoidCallback? onToggleObscure,
-  }) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword ? obscureText : false,
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.grey.shade100,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-        suffixIcon: isPassword
-            ? IconButton(
-                icon: Icon(obscureText ? Icons.visibility_off : Icons.visibility),
-                onPressed: onToggleObscure,
-              )
-            : null,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: AppStyles.primarySoft, borderRadius: BorderRadius.circular(12)),
+            child: const Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, color: AppStyles.primaryColor, size: 20),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    "Evin ortak e-postası ve şifresiyle tüm aile üyeleri giriş yapar; herkes uygulamada kendi adını seçer.",
+                    style: TextStyle(color: AppStyles.textColor),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            controller: _houseNameController,
+            maxLength: 100,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(
+              hintText: "Ev adı (örn: Bizim Yuva)",
+              prefixIcon: Icon(Icons.home_outlined),
+              counterText: "",
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(hintText: "Ortak e-posta", prefixIcon: Icon(Icons.email_outlined)),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _register(),
+            decoration: InputDecoration(
+              hintText: "Şifre (en az 8 karakter)",
+              prefixIcon: const Icon(Icons.lock_outline_rounded),
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          FilledButton(
+            onPressed: _isLoading ? null : _register,
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(54)),
+            child: _isLoading
+                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                : const Text("Kaydı tamamla", style: TextStyle(fontSize: 16)),
+          ),
+        ],
       ),
     );
   }

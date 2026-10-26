@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/app_theme.dart';
 import '../../core/api_service.dart';
-import 'home_info_screen.dart';
+import '../../core/widgets/page_header.dart';
+import 'manage_home_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final Function(int) onTabChange;
@@ -13,47 +14,65 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
+  // Anket oyları başka cihazlardan da gelebildiği için panel kendini yeniler.
+  // Sadece panel açıkken ve uygulama öndeyken çalışır (bkz. didChangeAppLifecycleState).
+  static const _refreshInterval = Duration(seconds: 20);
+
   // ==========================================
-  // 🛑 BACKEND DEĞİŞKENLERİ (DOKUNMA)
+  // 🛑 BACKEND DEĞİŞKENLERİ
   // Buradaki değişkenler sunucudan gelen verileri tutar.
   // ==========================================
-  String houseName = "Yükleniyor...";
+  String houseName = "";
+  String? memberName;
   int pendingChoresCount = 0;
   int pendingShoppingCount = 0;
   bool isLoading = true;
   Timer? _timer;
   int? currentMemberId;
-  int? currentHouseId; 
+  int? currentHouseId;
 
   // Anket Verileri
   String pollQuestion = "";
   List<dynamic> pollOptions = [];
   bool hasActivePoll = false;
-  bool hasVoted = false; 
+  bool hasVoted = false;
   int? activePollId;
-  int? votedOptionId; 
+  int? votedOptionId;
 
   @override
   void initState() {
     super.initState();
-    _loadHomeData(); 
+    WidgetsBinding.instance.addObserver(this);
+    _loadHomeData();
     _startAutoRefresh();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _loadHomeData(isSilent: true);
+      _startAutoRefresh();
+    } else if (state == AppLifecycleState.paused) {
+      _timer?.cancel();
+    }
+  }
+
   // ==========================================
-  // 🛑 BACKEND FONKSİYONLARI (DOKUNMA)
+  // 🛑 BACKEND FONKSİYONLARI
   // Veri çekme, oy verme ve zamanlayıcı işlemleri.
   // ==========================================
 
   void _startAutoRefresh() {
-    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    _timer?.cancel();
+    _timer = Timer.periodic(_refreshInterval, (timer) {
       if (mounted) _loadHomeData(isSilent: true);
     });
   }
@@ -62,282 +81,243 @@ class _HomeScreenState extends State<HomeScreen> {
     final prefs = await SharedPreferences.getInstance();
     int? houseId = prefs.getInt('saved_house_id');
     int? memberId = prefs.getInt('saved_member_id');
-    
-    if (houseId != null) {
-      currentHouseId = houseId;
-      currentMemberId = memberId;
 
-      // 🛠️ DÜZELTME: Yükleme başladığı an eski veriyi temizle
-      if (!isSilent) {
-        setState(() {
-          isLoading = true;
-          houseName = "Yükleniyor..."; // Eski isim yerine bunu yaz
-          pendingChoresCount = 0;      // Sayıları sıfırla
-          pendingShoppingCount = 0;
-        });
-      }
-      final stats = await ApiService.getHomeStats(houseId);
-      final pollData = await ApiService.getActivePoll(houseId, memberId ?? 0);
+    if (houseId == null) return;
 
-      if (mounted) {
-        setState(() {
-          if (stats.isNotEmpty && stats['status'] == 'success') {
-            houseName = stats['house_name'];
-            pendingChoresCount = int.parse(stats['pending_chores'].toString());
-            pendingShoppingCount = int.parse(stats['pending_items'].toString());
-          }
+    currentHouseId = houseId;
+    currentMemberId = memberId;
 
-          if (pollData.isNotEmpty && pollData['status'] == 'success') {
-            hasActivePoll = true;
-            activePollId = int.parse(pollData['poll_id'].toString());
-            pollQuestion = pollData['question'];
-            pollOptions = pollData['options'];
-            hasVoted = pollData['has_voted'] == true;
-            votedOptionId = pollData['voted_option_id'] != null ? int.parse(pollData['voted_option_id'].toString()) : null;
-          } else {
-            hasActivePoll = false;
-          }
-          isLoading = false;
-        });
-      }
+    if (!isSilent && mounted) {
+      setState(() {
+        isLoading = true;
+        houseName = prefs.getString('saved_house_name') ?? "";
+        memberName = prefs.getString('saved_member_name');
+      });
     }
+
+    final stats = await ApiService.getHomeStats(houseId);
+    final pollData = await ApiService.getActivePoll(houseId, memberId ?? 0);
+
+    if (!mounted) return;
+    setState(() {
+      if (stats['status'] == 'success') {
+        houseName = stats['house_name'];
+        pendingChoresCount = int.parse(stats['pending_chores'].toString());
+        pendingShoppingCount = int.parse(stats['pending_items'].toString());
+      }
+
+      if (pollData['status'] == 'success') {
+        hasActivePoll = true;
+        activePollId = int.parse(pollData['poll_id'].toString());
+        pollQuestion = pollData['question'];
+        pollOptions = pollData['options'];
+        hasVoted = pollData['has_voted'] == true;
+        votedOptionId = pollData['voted_option_id'] != null ? int.parse(pollData['voted_option_id'].toString()) : null;
+      } else {
+        hasActivePoll = false;
+      }
+      isLoading = false;
+    });
   }
 
   Future<void> _handleVote(int optionId) async {
     if (currentMemberId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Oy vermek için lütfen Ayarlar'dan kim olduğunuzu seçin."),
-          backgroundColor: Colors.red,
-        )
+        const SnackBar(content: Text("Oy vermek için lütfen Ayarlar'dan kim olduğunuzu seçin.")),
       );
-      widget.onTabChange(4); 
+      widget.onTabChange(4);
       return;
     }
 
     if (hasVoted) return;
 
     bool success = await ApiService.votePoll(activePollId!, optionId, currentHouseId!, currentMemberId!);
-    
+    if (!mounted) return;
+
     if (success) {
       await _loadHomeData(isSilent: true);
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Oyunuz kaydedildi!")));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Oyunuz kaydedildi!")));
     } else {
-      if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Hata oluştu.")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Oy kaydedilemedi.")));
+    }
+  }
+
+  Future<void> _createPoll(String question, List<String> options) async {
+    final houseId = currentHouseId;
+    if (houseId == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final success = await ApiService.createPoll(houseId, question, options);
+    if (success) {
+      await _loadHomeData(isSilent: true);
+      messenger.showSnackBar(const SnackBar(content: Text("Anket oluşturuldu!")));
+    } else {
+      messenger.showSnackBar(const SnackBar(content: Text("Anket oluşturulurken hata oluştu.")));
     }
   }
   // ==========================================
   // 🏁 BACKEND FONKSİYONLARI BİTİŞ
   // ==========================================
 
-
-  // ==========================================
-  // ⚠️ KARIŞIK ALAN (ANKET OLUŞTURMA PENCERESİ)
-  // Burası tasarım kodudur AMA "Oluştur" butonunun içi Backend'dir.
-  // ==========================================
-  void _showCreatePollDialog() {
-    final TextEditingController questionCtrl = TextEditingController();
-    final List<TextEditingController> optionCtrls = [
-      TextEditingController(),
-      TextEditingController()
-    ];
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder( 
-        builder: (context, setStateDialog) {
-          return AlertDialog(
-            title: const Text("Yeni Anket Oluştur"), // Tasarım
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: questionCtrl,
-                    decoration: const InputDecoration(labelText: "Soru (Örn: Ne yiyelim?)"),
-                  ),
-                  const SizedBox(height: 15),
-                  const Text("Seçenekler:", style: TextStyle(fontWeight: FontWeight.bold)),
-                  ...List.generate(optionCtrls.length, (index) {
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: TextField(
-                        controller: optionCtrls[index],
-                        decoration: InputDecoration(
-                          labelText: "${index + 1}. Seçenek",
-                          isDense: true,
-                        ),
-                      ),
-                    );
-                  }),
-                  TextButton.icon(
-                    onPressed: () {
-                      setStateDialog(() {
-                        optionCtrls.add(TextEditingController());
-                      });
-                    },
-                    icon: const Icon(Icons.add),
-                    label: const Text("Seçenek Ekle"),
-                  )
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("İptal")),
-              
-              // --- 🛑 BURASI BACKEND İŞLEMİDİR ---
-              ElevatedButton(
-                onPressed: () async {
-                  int? targetId = currentHouseId;
-                  if (targetId == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Oturum bilgisi yüklenemedi. Lütfen sayfayı yenileyin."))
-                    );
-                    return; 
-                  }
-                  String q = questionCtrl.text.trim();
-                  List<String> opts = optionCtrls.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
-
-                  if (q.isNotEmpty && opts.length >= 2) {
-                    Navigator.pop(ctx);
-                    bool success = await ApiService.createPoll(targetId, q, opts); // API Çağrısı
-                    
-                    if (success) {
-                      _loadHomeData(); 
-                      if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Anket oluşturuldu!")));
-                      }
-                    } else {
-                      if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Anket oluşturulurken hata oluştu.")));
-                      }
-                    }
-                  } else {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Soru ve en az 2 seçenek girin")));
-                  }
-                },
-                child: const Text("Oluştur"),
-              )
-              // --- 🏁 BACKEND İŞLEMİ BİTİŞ ---
-            ],
-          );
-        },
-      ),
-    );
-  }
-
   // ==========================================
   // 🎨 TASARIM ALANI (FRONTEND)
-  // Burası ana ekranın görüntüsüdür. Renkleri, kartları,
-  // yazıları buradan değiştirebilirsin.
   // ==========================================
+
+  String get _greeting {
+    final hour = DateTime.now().hour;
+    final base = hour < 12 ? "Günaydın" : (hour < 18 ? "İyi günler" : "İyi akşamlar");
+    return memberName == null ? base : "$base, $memberName";
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppStyles.backgroundColor,
+      appBar: PageHeader(
+        icon: Icons.home_rounded,
+        title: houseName.isEmpty ? "HomePal" : houseName,
+        subtitle: _greeting,
+        leading: _buildAvatar(),
+      ),
       body: RefreshIndicator(
-        onRefresh: () async { await _loadHomeData(isSilent: false); },
-        color: AppStyles.primaryColor,
-        child: CustomScrollView(
-          slivers: [
-            // Üstteki Renkli Alan (App Bar)
-            SliverAppBar(
-              expandedHeight: 150.0,
-              pinned: true,
-              elevation: 0,
-              backgroundColor: AppStyles.primaryColor,
-              flexibleSpace: FlexibleSpaceBar(
-                titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
-                title: Text(
-                  isLoading ? '...' : houseName, // Ev ismi burada yazar
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                ),
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppStyles.primaryColor, Color(0xFF34495E)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+        onRefresh: () => _loadHomeData(isSilent: true),
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+          children: [
+            if (!isLoading && currentMemberId == null) ...[
+              _buildMemberPrompt(),
+              const SizedBox(height: 16),
+            ],
+            Row(
+              children: [
+                Expanded(
+                  child: _SummaryCard(
+                    icon: Icons.task_alt_rounded,
+                    color: AppStyles.primaryColor,
+                    softColor: AppStyles.primarySoft,
+                    count: pendingChoresCount,
+                    label: "bekleyen iş",
+                    isLoading: isLoading,
+                    onTap: () => widget.onTabChange(1),
                   ),
                 ),
-              ),
-            ),
-
-            // Sayfanın İçeriği
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Hızlı Bakış', style: AppStyles.appBarTitle),
-                    const SizedBox(height: 15),
-                    
-                    // İşler ve Market Kartları
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildSummaryCard("İşler", "$pendingChoresCount Bekliyor", Icons.task_alt, Colors.orange.shade100, () => widget.onTabChange(1)),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: _buildSummaryCard("Market", "$pendingShoppingCount Ürün", Icons.shopping_bag_outlined, Colors.green.shade100, () => widget.onTabChange(2)),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    // --- ANKET BÖLÜMÜ (Tasarım kodları aşağıdadır) ---
-                    _buildPollSection(),
-                    
-                    const SizedBox(height: 30),
-
-                    const Text('Diğer İşlemler', style: AppStyles.appBarTitle),
-                    const SizedBox(height: 12),
-                    
-                    // Alt Kısımdaki Butonlar
-                    _buildQuickActions(),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SummaryCard(
+                    icon: Icons.shopping_basket_rounded,
+                    color: AppStyles.accentColor,
+                    softColor: AppStyles.accentSoft,
+                    count: pendingShoppingCount,
+                    label: "alınacak ürün",
+                    isLoading: isLoading,
+                    onTap: () => widget.onTabChange(2),
+                  ),
                 ),
-              ),
+              ],
             ),
+            const SizedBox(height: 24),
+            const SectionHeader(title: "Ev anketi"),
+            _buildPollSection(),
+            const SizedBox(height: 24),
+            const SectionHeader(title: "Kısayollar"),
+            _buildShortcuts(),
           ],
         ),
       ),
     );
   }
 
-  // --- WIDGET TASARIM METOTLARI ---
+  // Başlık bandındaki profil rozeti (seçili kişinin baş harfi); dokununca Ayarlar
+  Widget _buildAvatar() {
+    final initial = (memberName ?? houseName).trim();
+    return Tooltip(
+      message: "Ayarlar",
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => widget.onTabChange(4),
+        child: CircleAvatar(
+          radius: 22,
+          backgroundColor: Colors.white,
+          foregroundColor: AppStyles.primaryColor,
+          child: initial.isEmpty
+              ? const Icon(Icons.person_rounded)
+              : Text(initial.characters.first.toUpperCase(),
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+        ),
+      ),
+    );
+  }
+
+  // Görev atama, bildirim ve oylama için cihazın hangi üyeye ait olduğu gerekli
+  Widget _buildMemberPrompt() {
+    return Material(
+      color: AppStyles.primaryColor,
+      borderRadius: BorderRadius.circular(AppStyles.radius),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => widget.onTabChange(4),
+        child: const Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Icon(Icons.person_pin_circle_rounded, color: Colors.white, size: 32),
+              SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Sen kimsin?",
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                    SizedBox(height: 2),
+                    Text("Bildirim alabilmek ve oy verebilmek için profilini seç.",
+                        style: TextStyle(color: Colors.white70)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildPollSection() {
-    // 1. Aktif Anket Yoksa -> OLUŞTUR BUTONU TASARIMI
+    // Aktif anket yoksa: oluşturma kartı
     if (!hasActivePoll) {
-       return Container(
+      return Container(
         padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)],
-        ),
-        child: Column(
+        decoration: AppStyles.cardDecoration,
+        child: Row(
           children: [
-            const Text("Şu an aktif bir anket yok.", style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 10),
-            ElevatedButton.icon(
-              onPressed: _showCreatePollDialog, 
-              icon: const Icon(Icons.add_chart), 
-              label: const Text("Anket Oluştur"),
-              style: ElevatedButton.styleFrom(backgroundColor: AppStyles.accentColor, foregroundColor: Colors.white),
-            )
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(color: AppStyles.accentSoft, borderRadius: BorderRadius.circular(14)),
+              child: const Icon(Icons.how_to_vote_rounded, color: AppStyles.accentColor),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Aktif anket yok", style: AppStyles.listTileTitle),
+                  SizedBox(height: 2),
+                  Text("Ortak kararları oylamayla verin.", style: AppStyles.listTileSubtitle),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            FilledButton(
+              onPressed: _showCreatePollDialog,
+              style: FilledButton.styleFrom(backgroundColor: AppStyles.accentColor),
+              child: const Text("Oluştur"),
+            ),
           ],
         ),
-       );
+      );
     }
 
-    // 2. Aktif Anket Varsa -> OYLAMA EKRANI TASARIMI
+    // Aktif anket varsa: oylama / sonuçlar
     int totalVotes = 0;
     for (var opt in pollOptions) {
       totalVotes += int.parse(opt['vote_count'].toString());
@@ -345,128 +325,267 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15)],
-      ),
+      decoration: AppStyles.cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("📊 Günün Anketi", style: TextStyle(fontWeight: FontWeight.bold, color: AppStyles.accentColor)),
-              if (hasVoted) const Chip(label: Text("Oy Verildi", style: TextStyle(fontSize: 10, color: Colors.white)), backgroundColor: Colors.green, padding: EdgeInsets.all(0),),
+              Expanded(
+                child: Text(pollQuestion,
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppStyles.textColor)),
+              ),
+              if (hasVoted)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: AppStyles.successSoft, borderRadius: BorderRadius.circular(20)),
+                  child: const Text("Oy verildi",
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppStyles.successColor)),
+                ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(pollQuestion, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 20),
-          
+          const SizedBox(height: 4),
+          Text(
+            hasVoted ? "$totalVotes oy kullanıldı" : "Oy vermek için bir seçeneğe dokunun",
+            style: AppStyles.listTileSubtitle,
+          ),
+          const SizedBox(height: 16),
           ...pollOptions.map((option) {
-            int voteCount = int.parse(option['vote_count'].toString());
-            int optionId = int.parse(option['id'].toString());
-            
-            // ⚠️ MATEMATİKSEL HESAP (Yüzde hesaplama)
-            double percent = totalVotes == 0 ? 0 : voteCount / totalVotes;
-            
-            bool isMyChoice = votedOptionId == optionId;
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: InkWell(
-                onTap: hasVoted ? null : () => _handleVote(optionId), 
-                child: Stack(
-                  children: [
-                    Container(
-                      height: 45,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    // Animasyonlu Yüzde Çubuğu
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 500),
-                      height: 45,
-                      width: MediaQuery.of(context).size.width * percent * 0.75,
-                      decoration: BoxDecoration(
-                        color: isMyChoice 
-                            ? AppStyles.accentColor.withOpacity(0.6) 
-                            : (hasVoted ? Colors.grey.shade400 : AppStyles.accentColor.withOpacity(0.2)),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    Container(
-                      height: 45,
-                      padding: const EdgeInsets.symmetric(horizontal: 15),
-                      alignment: Alignment.centerLeft,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(option['option_text'], style: TextStyle(fontWeight: isMyChoice ? FontWeight.bold : FontWeight.normal)),
-                          if(hasVoted) Text("%${(percent * 100).toInt()} ($voteCount)"), 
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            final voteCount = int.parse(option['vote_count'].toString());
+            final optionId = int.parse(option['id'].toString());
+            final percent = totalVotes == 0 ? 0.0 : voteCount / totalVotes;
+            return _PollOptionBar(
+              text: option['option_text'],
+              percent: percent,
+              voteCount: voteCount,
+              showResult: hasVoted,
+              isMyChoice: votedOptionId == optionId,
+              onTap: hasVoted ? null : () => _handleVote(optionId),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildQuickActions() {
-    return Row(
-      children: [
-        _buildActionItem(Icons.people_alt_rounded, "Kişiler", () => widget.onTabChange(4)),
-        _buildActionItem(Icons.info_rounded, "Ev Bilgi", () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const HomeInfoScreen()));
-        }),
-      ],
+  Widget _buildShortcuts() {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.people_alt_rounded),
+            title: const Text("Ev üyeleri", style: AppStyles.listTileTitle),
+            subtitle: const Text("Üye ekle veya çıkar"),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageHomeScreen())),
+          ),
+          const Divider(indent: 16, endIndent: 16),
+          ListTile(
+            leading: const Icon(Icons.info_rounded),
+            title: const Text("Ev bilgileri", style: AppStyles.listTileTitle),
+            subtitle: const Text("Wi-Fi, kapı kodu, eşyaların yeri"),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => widget.onTabChange(3),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildSummaryCard(String title, String count, IconData icon, Color color, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: AppStyles.primaryColor, size: 30),
-            const SizedBox(height: 12),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            Text(count, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w500)),
-          ],
+  // Anket oluşturma penceresi
+  void _showCreatePollDialog() {
+    final questionCtrl = TextEditingController();
+    final optionCtrls = [TextEditingController(), TextEditingController()];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text("Yeni anket", style: AppStyles.popupHeader),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: questionCtrl,
+                  autofocus: true,
+                  maxLength: 255,
+                  decoration: const InputDecoration(hintText: "Soru (örn: Bu akşam ne yiyelim?)", counterText: ""),
+                ),
+                const SizedBox(height: 12),
+                ...List.generate(optionCtrls.length, (index) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: TextField(
+                      controller: optionCtrls[index],
+                      maxLength: 100,
+                      decoration: InputDecoration(
+                        hintText: "${index + 1}. seçenek",
+                        counterText: "",
+                        prefixIcon: const Icon(Icons.radio_button_unchecked, size: 18),
+                      ),
+                    ),
+                  );
+                }),
+                if (optionCtrls.length < 10)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => setSheetState(() => optionCtrls.add(TextEditingController())),
+                      icon: const Icon(Icons.add),
+                      label: const Text("Seçenek ekle"),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                FilledButton(
+                  onPressed: () {
+                    final q = questionCtrl.text.trim();
+                    final opts = optionCtrls.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
+                    if (q.isEmpty || opts.length < 2) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Soru ve en az 2 seçenek girin")),
+                      );
+                      return;
+                    }
+                    Navigator.pop(ctx);
+                    _createPoll(q, opts);
+                  },
+                  child: const Text("Anketi başlat"),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
-  
-  Widget _buildActionItem(IconData icon, String label, VoidCallback onTap) {
-    return Expanded(
+}
+
+class _SummaryCard extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final Color softColor;
+  final int count;
+  final String label;
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  const _SummaryCard({
+    required this.icon,
+    required this.color,
+    required this.softColor,
+    required this.count,
+    required this.label,
+    required this.isLoading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Column(
-          children: [
-            CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Icon(icon, color: AppStyles.primaryColor),
-            ),
-            const SizedBox(height: 5),
-            Text(label, style: const TextStyle(fontSize: 12)),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(color: softColor, borderRadius: BorderRadius.circular(12)),
+                    child: Icon(icon, color: color, size: 22),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.arrow_forward_rounded, size: 18, color: AppStyles.mutedTextColor),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                isLoading ? "–" : "$count",
+                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppStyles.textColor),
+              ),
+              Text(label, style: AppStyles.listTileSubtitle),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PollOptionBar extends StatelessWidget {
+  final String text;
+  final double percent;
+  final int voteCount;
+  final bool showResult;
+  final bool isMyChoice;
+  final VoidCallback? onTap;
+
+  const _PollOptionBar({
+    required this.text,
+    required this.percent,
+    required this.voteCount,
+    required this.showResult,
+    required this.isMyChoice,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = isMyChoice ? AppStyles.primaryColor.withValues(alpha: 0.22) : AppStyles.primaryColor.withValues(alpha: 0.10);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: const Color(0xFFF1F4F9),
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Stack(
+            children: [
+              // Oy oranı çubuğu (kartın genişliğine göre; yatay ekranda da doğru)
+              if (showResult)
+                Positioned.fill(
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: percent,
+                    child: AnimatedContainer(duration: const Duration(milliseconds: 400), color: fill),
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                child: Row(
+                  children: [
+                    if (isMyChoice) ...[
+                      const Icon(Icons.check_circle_rounded, size: 18, color: AppStyles.primaryColor),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Text(
+                        text,
+                        style: TextStyle(
+                          fontWeight: isMyChoice ? FontWeight.w700 : FontWeight.w500,
+                          color: AppStyles.textColor,
+                        ),
+                      ),
+                    ),
+                    if (showResult)
+                      Text("%${(percent * 100).round()}",
+                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppStyles.textColor)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

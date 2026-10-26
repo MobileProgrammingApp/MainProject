@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api_service.dart';
 import '../../core/app_theme.dart';
+import '../../core/widgets/page_header.dart';
 
 class ShoppingScreen extends StatefulWidget {
   const ShoppingScreen({super.key});
-  
+
   @override
   State<ShoppingScreen> createState() => _ShoppingScreenState();
 }
@@ -13,124 +14,107 @@ class ShoppingScreen extends StatefulWidget {
 class _ShoppingScreenState extends State<ShoppingScreen> {
   final List<_ShoppingItem> _items = [];
   final TextEditingController _controller = TextEditingController();
-  
-  int? _currentHouseId; 
+  final FocusNode _inputFocus = FocusNode();
+
   bool _isLoading = true;
+  bool _isAdding = false;
 
   @override
   void initState() {
     super.initState();
-    // didChangeDependencies içinde çağrılacak
-  }
-
-  // --- DÜZELTME: Sayfa her odaklandığında çalışır ---
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _loadData();
+    // Sekmeye her geçişte sayfa yeniden kurulur (AppScaffold), veri burada çekilir.
+    _fetchItems();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _inputFocus.dispose();
     super.dispose();
   }
 
-  // Verileri ve Kimliği Hafızadan Taze Çek
-  Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-    // 🔥 ÖNEMLİ: Hafızayı tazele (Eski kullanıcının verisi kalmasın)
-    await prefs.reload();
-    // Önce temizle
-    if (mounted) {
-      setState(() {
-        _items.clear();
-        _isLoading = true;
-      });
-    }
-
-    int? savedId = prefs.getInt('saved_house_id');
-
-    if (savedId != null) {
-      if (mounted) {
-        setState(() {
-          _currentHouseId = savedId;
-        });
-      }
-      await _fetchItems();
-    } else {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
+  // ==========================================
+  // 🛑 BACKEND FONKSİYONLARI
+  // ==========================================
 
   Future<void> _fetchItems() async {
-    if (_currentHouseId == null) return;
-
     final data = await ApiService.getItems();
+    if (!mounted) return;
 
-    if (mounted) {
-      setState(() {
-        _items.clear();
-        for (var item in data) {
-          bool isDone = (item['is_bought'] == 1 || item['is_bought'] == "1");
-
-          _items.add(_ShoppingItem(
-            id: int.parse(item['id'].toString()),
-            name: item['item_name'],
-            done: isDone,
-            order: 0,
-          ));
-        }
-        _isLoading = false;
-      });
-    }
+    setState(() {
+      _items
+        ..clear()
+        ..addAll(data.map((item) => _ShoppingItem(
+              id: int.parse(item['id'].toString()),
+              name: item['item_name'],
+              done: item['is_bought'] == 1 || item['is_bought'] == "1",
+            )));
+      _isLoading = false;
+    });
   }
 
-  Future<void> _addItem(String name) async {
-    if (_currentHouseId == null) return;
+  Future<void> _addItem() async {
+    final name = _controller.text.trim();
+    if (name.isEmpty || _isAdding) return;
 
+    setState(() => _isAdding = true);
     final prefs = await SharedPreferences.getInstance();
     // Ekleyen üye biliniyorsa sunucu ona bildirim göndermez
     final success = await ApiService.addItem(name, prefs.getInt('saved_member_id'));
+    if (!mounted) return;
 
+    setState(() => _isAdding = false);
     if (success) {
+      _controller.clear();
+      _inputFocus.requestFocus(); // Art arda ürün eklemek için klavye açık kalsın
       await _fetchItems();
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Eklenemedi")),
-      );
+    } else {
+      _showMessage("Eklenemedi");
     }
   }
 
-  Future<void> _toggleById(int id) async {
-    final idx = _items.indexWhere((e) => e.id == id);
-    if (idx == -1) return;
+  // Değişiklik ekrana hemen yansır; sunucu reddederse geri alınır.
+  Future<void> _toggle(_ShoppingItem item) async {
+    final index = _items.indexOf(item);
+    if (index == -1) return;
 
-    final success = await ApiService.setItemBought(id, !_items[idx].done);
+    final updated = item.copyWith(done: !item.done);
+    setState(() => _items[index] = updated);
 
-    if (success) {
-      await _fetchItems();
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Güncellenemedi")),
-      );
+    final success = await ApiService.setItemBought(item.id, updated.done);
+    if (!success && mounted) {
+      setState(() {
+        final i = _items.indexOf(updated);
+        if (i != -1) _items[i] = item;
+      });
+      _showMessage("Güncellenemedi");
     }
   }
 
-  Future<void> _deleteById(int id) async {
-    final success = await ApiService.deleteItem(id);
+  Future<void> _delete(_ShoppingItem item) async {
+    // Kaydırarak silinen öğe hemen listeden çıkmalı (Dismissible bunu bekler)
+    setState(() => _items.remove(item));
 
-    if (success) {
-      _fetchItems();
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Silinemedi")),
-      );
+    final success = await ApiService.deleteItem(item.id);
+    if (!success && mounted) {
+      _showMessage("Silinemedi");
+      await _fetchItems();
     }
+  }
+
+  Future<void> _clearBought() async {
+    final bought = _items.where((e) => e.done).toList();
+    setState(() => _items.removeWhere((e) => e.done));
+
+    final results = await Future.wait(bought.map((e) => ApiService.deleteItem(e.id)));
+    if (results.contains(false) && mounted) {
+      _showMessage("Bazı ürünler silinemedi");
+      await _fetchItems();
+    }
+  }
+
+  void _showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   // ==========================================
@@ -141,189 +125,135 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
   Widget build(BuildContext context) {
     final pending = _items.where((e) => !e.done).toList();
     final done = _items.where((e) => e.done).toList();
-    
+
     return Scaffold(
-      backgroundColor: AppStyles.backgroundColor, 
-      
-      appBar: AppBar(
-        title: const Text('🛒 Market Listesi'), 
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: Center(
-              child: Chip(
-                avatar: const Icon(Icons.shopping_basket, color: Colors.green, size: 16),
-                label: Text('${done.length}/${_items.length} Ürün', style: const TextStyle(fontSize: 12)),
-                backgroundColor: Colors.green.shade50,
-              ),
-            ),
-          ),
-          if (done.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.cleaning_services, color: AppStyles.accentColor),
-              tooltip: "Alınanları Temizle",
-              onPressed: () async {
-                for (var item in done) {
-                  await _deleteById(item.id); 
-                }
-              },
-            ),
-        ],
+      appBar: PageHeader(
+        icon: Icons.shopping_basket_rounded,
+        title: "Market listesi",
+        subtitle: _isLoading
+            ? null
+            : _items.isEmpty
+                ? "Liste boş"
+                : pending.isEmpty
+                    ? "Her şey alındı"
+                    : "${pending.length} ürün alınacak",
       ),
-      
-      floatingActionButton: FloatingActionButton(
-        heroTag: "btn_add_shopping_item",
-        onPressed: _showAddItemSheet,
-        backgroundColor: AppStyles.primaryColor,
-        child: const Icon(Icons.add_shopping_cart, color: Colors.white),
-      ),
-
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : RefreshIndicator(
-            onRefresh: _loadData, // Çek bırak yenile
-            child: _items.isEmpty 
-              ? _buildEmptyState()
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (pending.isNotEmpty) ...[
-                      Text(
-                        'Alınacaklar', 
-                        style: Theme.of(context).textTheme.headlineSmall, 
-                      ),
-                      const SizedBox(height: 10),
-                      ...pending.map((it) => _buildShoppingCard(it, false)),
-                    ],
-
-                    if (done.isNotEmpty) ...[
-                      const SizedBox(height: 30),
-                      Text(
-                        'Sepete Atılanlar', 
-                        style: Theme.of(context).textTheme.headlineSmall, 
-                      ),
-                      const SizedBox(height: 10),
-                      ...done.map((it) => _buildShoppingCard(it, true)),
-                    ],
-                  ],
-                ),
-        ),
-    );
-  }
-
-  Widget _buildShoppingCard(_ShoppingItem it, bool isDone) {
-    return Card(
-      elevation: 2, 
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Dismissible(
-        key: ValueKey(it.id),
-        direction: DismissDirection.endToStart,
-        background: Container(
-          alignment: Alignment.centerRight,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          decoration: BoxDecoration(
-            color: AppStyles.deleteColor,
-            borderRadius: BorderRadius.circular(12), 
-          ),
-          child: const Icon(Icons.delete_sweep, color: Colors.white),
-        ),
-        onDismissed: (direction) {
-          _deleteById(it.id); 
-        },
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          leading: Checkbox(
-            value: it.done,
-            activeColor: Colors.green, 
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-            onChanged: (val) {
-              _toggleById(it.id); 
-            },
-          ),
-          title: Text(
-            it.name,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: isDone ? FontWeight.normal : FontWeight.bold,
-              decoration: isDone ? TextDecoration.lineThrough : null,
-              color: isDone ? Colors.grey : Colors.black87,
-            ),
-          ),
-          trailing: IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
-            onPressed: () => _deleteById(it.id),
-          ),
-          onTap: () {
-            _toggleById(it.id);
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      body: Column(
         children: [
-          Icon(Icons.shopping_cart_outlined, size: 100, color: Colors.grey.shade200),
-          const SizedBox(height: 20),
-          Text('Listen boş gözüküyor!', style: AppStyles.listTileTitle),
-          Text('Hemen bir şeyler ekle.', style: AppStyles.listTileSubtitle),
+          _buildAddBar(),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : RefreshIndicator(
+                    onRefresh: _fetchItems,
+                    child: _items.isEmpty
+                        ? const EmptyState(
+                            icon: Icons.shopping_basket_outlined,
+                            title: "Liste boş",
+                            message: "Eksik bir şey olduğunda yukarıdan ekle,\nevdeki herkes görsün.",
+                            color: AppStyles.accentColor,
+                            softColor: AppStyles.accentSoft,
+                          )
+                        : ListView(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                            children: [
+                              SectionHeader(
+                                title: pending.isEmpty ? "Her şey alındı 🎉" : "Alınacaklar",
+                                count: pending.length,
+                              ),
+                              if (pending.isNotEmpty)
+                                GroupedCard(dividerIndent: 56, children: pending.map(_buildItemRow).toList()),
+                              if (done.isNotEmpty) ...[
+                                const SizedBox(height: 24),
+                                SectionHeader(
+                                  title: "Sepette",
+                                  count: done.length,
+                                  action: TextButton.icon(
+                                    onPressed: _clearBought,
+                                    icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                                    label: const Text("Temizle"),
+                                    style: TextButton.styleFrom(foregroundColor: AppStyles.mutedTextColor),
+                                  ),
+                                ),
+                                GroupedCard(dividerIndent: 56, children: done.map(_buildItemRow).toList()),
+                              ],
+                            ],
+                          ),
+                  ),
+          ),
         ],
       ),
     );
   }
 
-  Future<void> _showAddItemSheet() async {
-    _controller.clear();
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: EdgeInsets.only(
-          left: 20, right: 20, top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch, 
-          children: [
-             Text(
-              '➕ Ne Lazım?', 
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            TextField(
+  Widget _buildAddBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
               controller: _controller,
-              autofocus: true,
+              focusNode: _inputFocus,
+              maxLength: 255,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.done,
               decoration: const InputDecoration(
-                labelText: 'Ürün Adı (Örn: Süt, Ekmek)',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.shopping_bag),
+                hintText: "Ne lazım? (örn: süt, ekmek)",
+                prefixIcon: Icon(Icons.add_shopping_cart_rounded),
+                counterText: "",
               ),
-              onSubmitted: (v) { _addItem(v); Navigator.pop(ctx); },
+              onSubmitted: (_) => _addItem(),
             ),
-            const SizedBox(height: 20),
-            
-            ElevatedButton.icon(
-              icon: const Icon(Icons.save),
-              label: const Text('Listeye Ekle', style: TextStyle(fontSize: 16)),
-              onPressed: () { _addItem(_controller.text); Navigator.pop(ctx); },
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 15),
-              ),
+          ),
+          const SizedBox(width: 10),
+          SizedBox(
+            height: 50,
+            width: 50,
+            child: FilledButton(
+              onPressed: _isAdding ? null : _addItem,
+              style: FilledButton.styleFrom(padding: EdgeInsets.zero, backgroundColor: AppStyles.accentColor),
+              child: _isAdding
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.add_rounded),
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemRow(_ShoppingItem item) {
+    return Dismissible(
+      key: ValueKey(item.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        color: AppStyles.deleteColor,
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+      ),
+      onDismissed: (_) => _delete(item),
+      child: ListTile(
+        onTap: () => _toggle(item),
+        leading: Checkbox(
+          value: item.done,
+          activeColor: AppStyles.successColor,
+          onChanged: (_) => _toggle(item),
+        ),
+        title: Text(
+          item.name,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: item.done ? FontWeight.w400 : FontWeight.w600,
+            decoration: item.done ? TextDecoration.lineThrough : null,
+            color: item.done ? AppStyles.mutedTextColor : AppStyles.textColor,
+          ),
+        ),
+        trailing: IconButton(
+          tooltip: "Sil",
+          icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
+          onPressed: () => _delete(item),
         ),
       ),
     );
@@ -332,8 +262,9 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
 
 class _ShoppingItem {
   final int id;
-  final int order;
   final String name;
   final bool done;
-  _ShoppingItem({required this.id, required this.order, required this.name, required this.done});
+  const _ShoppingItem({required this.id, required this.name, required this.done});
+
+  _ShoppingItem copyWith({bool? done}) => _ShoppingItem(id: id, name: name, done: done ?? this.done);
 }

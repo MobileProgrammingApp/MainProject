@@ -4,7 +4,6 @@ import '../features/chores/chores.dart';
 import '../features/chores/shopping.dart';
 import '../features/home/home_info_screen.dart';
 import '../features/settings/settings_screen.dart';
-import 'app_theme.dart';
 
 class AppScaffold extends StatefulWidget {
   final int houseId;
@@ -23,21 +22,25 @@ class _AppScaffoldState extends State<AppScaffold> {
     });
   }
 
+  // Sadece seçili sekme oluşturulur. Sekmeye her geçişte sayfa yeniden
+  // kurulup güncel veriyi çeker; diğer sekmeler arka planda istek atmaz.
+  Widget _buildPage(int index) {
+    switch (index) {
+      case 1:
+        return const ChoresScreen();
+      case 2:
+        return const ShoppingScreen();
+      case 3:
+        return const HomeInfoScreen();
+      case 4:
+        return const SettingsScreen();
+      default:
+        return HomeScreen(onTabChange: _onItemTapped);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 🛠️ DEĞİŞİKLİK: Artık ChoresScreen ve ShoppingScreen'e ID göndermiyoruz.
-    // Kendileri hafızadan (SharedPreferences) okuyacaklar.
-    // Bu sayede HomeInfoScreen gibi sorunsuz çalışacaklar.
-    final List<Widget> _pages = [
-      // 🛑 'const' kelimelerini KALDIRIYORUZ ve 'key: UniqueKey()' ekliyoruz
-      // Bu sayede her giriş yapıldığında sayfalar sıfırdan üretilir.
-      HomeScreen(key: UniqueKey(), onTabChange: _onItemTapped),
-      ChoresScreen(key: UniqueKey()),
-      ShoppingScreen(key: UniqueKey()),
-      HomeInfoScreen(key: UniqueKey()),
-      SettingsScreen(key: UniqueKey()),
-    ];
-
     return PopScope(
       canPop: _selectedIndex == 0,
       onPopInvokedWithResult: (didPop, result) {
@@ -46,34 +49,34 @@ class _AppScaffoldState extends State<AppScaffold> {
         }
       },
       child: Scaffold(
-        body: IndexedStack(index: _selectedIndex, children: _pages),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _selectedIndex,
-          onTap: _onItemTapped,
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: AppStyles.accentColor,
-          unselectedItemColor: Colors.grey,
-          backgroundColor: Colors.white,
-          elevation: 8,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_rounded),
+        body: KeyedSubtree(key: ValueKey(_selectedIndex), child: _buildPage(_selectedIndex)),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _selectedIndex,
+          onDestinationSelected: _onItemTapped,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.space_dashboard_outlined),
+              selectedIcon: Icon(Icons.space_dashboard_rounded),
               label: 'Panel',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.assignment_turned_in_rounded),
+            NavigationDestination(
+              icon: Icon(Icons.task_alt_outlined),
+              selectedIcon: Icon(Icons.task_alt_rounded),
               label: 'İşler',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.shopping_basket_rounded),
+            NavigationDestination(
+              icon: Icon(Icons.shopping_basket_outlined),
+              selectedIcon: Icon(Icons.shopping_basket_rounded),
               label: 'Market',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.house_rounded),
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home_rounded),
               label: 'Ev Bilgi',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings_rounded),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings_rounded),
               label: 'Ayarlar',
             ),
           ],

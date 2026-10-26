@@ -3,10 +3,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
-import '../home/manageHome_screen.dart';
+import '../home/manage_home_screen.dart';
 import '../../../core/api_service.dart';
 import '../../../core/app_theme.dart';
 import '../../../core/notification_service.dart';
+import '../../../core/widgets/page_header.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -56,9 +57,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               if (exists) {
                 selectedMemberId = savedMemberId.toString();
+                _saveMemberName(prefs, selectedMemberId!);
               } else {
                 selectedMemberId = null;
                 prefs.remove('saved_member_id');
+                prefs.remove('saved_member_name');
               }
             } else {
               if (selectedMemberId != null) {
@@ -82,6 +85,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  // Panelde "İyi günler, <ad>" yazabilmek için seçili üyenin adını sakla
+  void _saveMemberName(SharedPreferences prefs, String memberId) {
+    final member = houseMembers.firstWhere((m) => m['id'].toString() == memberId, orElse: () => null);
+    if (member != null) prefs.setString('saved_member_name', member['name'].toString());
+  }
+
   // 2. Kişi Seçilince Kaydet
   Future<void> _onMemberChanged(String? newId) async {
     if (newId == null) return;
@@ -92,6 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('saved_member_id', int.parse(newId));
+    _saveMemberName(prefs, newId);
 
     // Bu cihazın bildirimleri artık seçilen üyeye gelsin (bildirimler açıksa)
     try {
@@ -114,239 +124,137 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ==========================================
   // 🎨 TASARIM ALANI (FRONTEND)
-  // Ayarlar menüsünün görüntüsü buradadır.
-  // İkonları, yazıları ve sıralamayı değiştirebilirsin.
   // ==========================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppStyles.backgroundColor,
-      appBar: AppBar(
-        title: const Text('Ayarlar', style: AppStyles.appBarTitle),
-        backgroundColor: AppStyles.backgroundColor,
-        centerTitle: true,
+      appBar: const PageHeader(
+        icon: Icons.settings_rounded,
+        title: "Ayarlar",
+        subtitle: "Profil, ev üyeleri ve bildirimler",
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
         children: [
-          const SizedBox(height: 8),
-
-          // --- "BEN KİMİM?" KUTUSU ---
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "👤 Ben Kimim?",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Uygulamayı hangi kişi olarak kullanıyorsunuz?",
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-                const SizedBox(height: 10),
-
-                isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : houseMembers.isEmpty
-                    ? InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                "Önce 'Evi Yönet' menüsünden bir kişi eklemelisiniz",
-                              ),
-                            ),
-                          );
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const ManageHomeScreen(),
-                            ),
-                          ).then((value) => _loadSettings());
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.grey.shade400),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.person_add_alt_1, color: Colors.grey),
-                              SizedBox(width: 10),
-                              Text(
-                                "Önce bir kişi ekleyin",
-                                style: TextStyle(color: Colors.grey),
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    : DropdownButtonFormField<String>(
-                        value: selectedMemberId,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 8,
-                          ),
-                        ),
-                        hint: const Text("Lütfen kendinizi seçin"),
-                        items: houseMembers.map<DropdownMenuItem<String>>((
-                          dynamic member,
-                        ) {
-                          return DropdownMenuItem<String>(
-                            value: member['id'].toString(),
-                            child: Text(member['name']),
-                          );
-                        }).toList(),
-                        onChanged:
-                            _onMemberChanged, // Backend fonksiyonunu tetikler
-                      ),
-              ],
-            ),
+          const SectionHeader(title: "Ben kimim?"),
+          _buildMemberCard(),
+          const SizedBox(height: 24),
+          const SectionHeader(title: "Hesap ve ev"),
+          GroupedCard(
+            dividerIndent: 72,
+            children: [
+              _menuTile(Icons.person_outline_rounded, "Profil", "Ev adı, e-posta ve şifre",
+                  () => _open(const ProfileScreen())),
+              _menuTile(Icons.people_alt_outlined, "Ev üyeleri", "Kişi ekle veya çıkar",
+                  () => _open(const ManageHomeScreen()).then((_) => _loadSettings())),
+              _menuTile(Icons.notifications_outlined, "Bildirimler", "Bildirimleri aç veya kapat",
+                  () => _open(const NotificationSettingsScreen())),
+            ],
           ),
-
-          const SizedBox(height: 20),
-          const Divider(),
-
-          // 🔹 Profil Menüsü
-          ListTile(
-            leading: const Icon(
-              Icons.person_outline,
-              color: AppStyles.primaryColor,
+          const SizedBox(height: 24),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: ListTile(
+              contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
+              leading: _badge(Icons.logout_rounded, AppStyles.deleteColor, const Color(0xFFFBE6E6)),
+              title: const Text("Çıkış yap",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppStyles.deleteColor)),
+              onTap: _confirmLogout,
             ),
-            title: const Text('Profil', style: AppStyles.listTileTitle),
-            trailing: const Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.grey,
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProfileScreen()),
-              );
-            },
-          ),
-          const Divider(),
-
-          // 🔹 Ev Yönetim Menüsü
-          ListTile(
-            leading: const Icon(
-              Icons.home_work_outlined,
-              color: AppStyles.primaryColor,
-            ),
-            title: const Text(
-              'Evi Yönet (Kişi Ekle/Sil)',
-              style: AppStyles.listTileTitle,
-            ),
-            trailing: const Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.grey,
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ManageHomeScreen()),
-              ).then((value) {
-                // Geri dönünce listeyi yenile (Backend işlemi)
-                _loadSettings();
-              });
-            },
-          ),
-
-          // 🔹 Bildirim Ayarları
-          ListTile(
-            leading: const Icon(
-              Icons.notifications_outlined,
-              color: AppStyles.primaryColor,
-            ),
-            title: const Text('Bildirimler', style: AppStyles.listTileTitle),
-            trailing: const Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.grey,
-            ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const NotificationSettingsScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-
-          // 🔹 Çıkış Yap Butonu
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.redAccent),
-            title: const Text(
-              'Çıkış Yap',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.redAccent,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            onTap: () async {
-              // Çıkış onayı penceresi
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Çıkış Yap'),
-                  content: const Text(
-                    'Uygulamadan çıkmak istediğine emin misin?',
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('İptal'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text(
-                        'Evet',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-
-              if (confirmed == true) {
-                // 1. Bildirimleri kapat, sunucudaki oturumu kapat, yerel verileri sil
-                await ApiService.logout();
-
-                if (!context.mounted) return;
-
-                // 2. 🔥 GEÇMİŞİ SİLEREK Giriş Ekranına Git
-                // (Geri tuşuna basınca tekrar uygulamaya dönemez)
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                  (Route<dynamic> route) => false,
-                );
-              }
-            },
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _open(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  Widget _badge(IconData icon, Color color, Color soft) {
+    return Container(
+      width: 42,
+      height: 42,
+      decoration: BoxDecoration(color: soft, borderRadius: BorderRadius.circular(12)),
+      child: Icon(icon, color: color, size: 22),
+    );
+  }
+
+  Widget _menuTile(IconData icon, String title, String subtitle, VoidCallback onTap) {
+    return ListTile(
+      contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
+      leading: _badge(icon, AppStyles.primaryColor, AppStyles.primarySoft),
+      title: Text(title, style: AppStyles.listTileTitle),
+      subtitle: Text(subtitle),
+      trailing: const Icon(Icons.chevron_right_rounded, color: AppStyles.mutedTextColor),
+      onTap: onTap,
+    );
+  }
+
+  // "Ben kimim?": bu cihazın hangi üyeye ait olduğu (görev bildirimleri ve oylar için)
+  Widget _buildMemberCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppStyles.cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            "Bu cihazı kim kullanıyor? Görev bildirimleri ve anket oyları bu kişiye göre işlenir.",
+            style: AppStyles.listTileSubtitle,
+          ),
+          const SizedBox(height: 14),
+          if (isLoading)
+            const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()))
+          else if (houseMembers.isEmpty)
+            OutlinedButton.icon(
+              onPressed: () => _open(const ManageHomeScreen()).then((_) => _loadSettings()),
+              icon: const Icon(Icons.person_add_alt_1_outlined),
+              label: const Text("Önce eve bir kişi ekle"),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: houseMembers.map<Widget>((member) {
+                final id = member['id'].toString();
+                return ChoiceChip(
+                  avatar: selectedMemberId == id ? null : const Icon(Icons.person_outline_rounded, size: 18),
+                  label: Text(member['name'].toString()),
+                  selected: selectedMemberId == id,
+                  onSelected: (_) => _onMemberChanged(id),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Çıkış yap'),
+        content: const Text('Bu cihazda oturumu kapatmak istediğine emin misin?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('İptal')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppStyles.deleteColor),
+            child: const Text('Çıkış yap'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    // Bildirimleri kapat, sunucudaki oturumu kapat, yerel verileri sil
+    await ApiService.logout();
+    if (!mounted) return;
+
+    // Geçmişi silerek giriş ekranına git (geri tuşuyla uygulamaya dönülemez)
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
     );
   }
 }
