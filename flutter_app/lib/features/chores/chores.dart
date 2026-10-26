@@ -75,6 +75,18 @@ class _ChoresScreenState extends State<ChoresScreen> {
     }
   }
 
+  Future<void> _edit(_Chore chore, String name, String assignedId) async {
+    if (name == chore.name && assignedId == chore.assignedId) return;
+    final success = await ApiService.editChore(chore.id, name, int.parse(assignedId));
+    if (!mounted) return;
+    if (success) {
+      await _fetchChores();
+      _showMessage(assignedId == chore.assignedId ? "Görev güncellendi" : "Görev ${_memberName(assignedId)} kişisine verildi");
+    } else {
+      _showMessage("Görev güncellenemedi");
+    }
+  }
+
   Future<void> _complete(_Chore chore) async {
     final success = await ApiService.completeChore(chore.id);
     if (!mounted) return;
@@ -148,7 +160,7 @@ class _ChoresScreenState extends State<ChoresScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: "btn_add_chore",
-        onPressed: _showAddSheet,
+        onPressed: () => _showChoreSheet(),
         icon: const Icon(Icons.add_rounded),
         label: const Text("Görev ekle"),
       ),
@@ -187,6 +199,7 @@ class _ChoresScreenState extends State<ChoresScreen> {
                           ),
                           GroupedCard(dividerIndent: 72, children: done.map(_buildDoneRow).toList()),
                         ],
+                        if (pending.isNotEmpty) const ListHint("Değiştirmek için göreve dokun"),
                       ],
                     ),
             ),
@@ -227,6 +240,7 @@ class _ChoresScreenState extends State<ChoresScreen> {
     return _swipeToDelete(
       chore,
       ListTile(
+        onTap: () => _showChoreSheet(chore),
         contentPadding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
         leading: CircleAvatar(
           backgroundColor: AppStyles.primarySoft,
@@ -271,14 +285,19 @@ class _ChoresScreenState extends State<ChoresScreen> {
     );
   }
 
-  Future<void> _showAddSheet() async {
+  /// [chore] verilirse görev düzenlenir, verilmezse yeni görev eklenir.
+  Future<void> _showChoreSheet([_Chore? chore]) async {
     await _fetchHouseMembers();
     if (!mounted) return;
 
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _AddChoreSheet(members: _houseMembers, onAdd: _addChore),
+      builder: (_) => _ChoreSheet(
+        members: _houseMembers,
+        initial: chore,
+        onSave: chore == null ? _addChore : (name, assignedId) => _edit(chore, name, assignedId),
+      ),
     );
   }
 }
@@ -291,19 +310,28 @@ class _Chore {
   const _Chore({required this.id, required this.name, required this.assignedId, required this.done});
 }
 
-class _AddChoreSheet extends StatefulWidget {
+class _ChoreSheet extends StatefulWidget {
   final List<dynamic> members;
-  final Future<void> Function(String name, String assignedId) onAdd;
+  final _Chore? initial;
+  final Future<void> Function(String name, String assignedId) onSave;
 
-  const _AddChoreSheet({required this.members, required this.onAdd});
+  const _ChoreSheet({required this.members, required this.onSave, this.initial});
 
   @override
-  State<_AddChoreSheet> createState() => _AddChoreSheetState();
+  State<_ChoreSheet> createState() => _ChoreSheetState();
 }
 
-class _AddChoreSheetState extends State<_AddChoreSheet> {
-  final _nameController = TextEditingController();
+class _ChoreSheetState extends State<_ChoreSheet> {
+  late final _nameController = TextEditingController(text: widget.initial?.name);
   String? _assignedId;
+
+  @override
+  void initState() {
+    super.initState();
+    // Görevin sahibi evden silindiyse yeni birini seçmek gerekir
+    final id = widget.initial?.assignedId;
+    if (widget.members.any((m) => m['id'].toString() == id)) _assignedId = id;
+  }
 
   @override
   void dispose() {
@@ -320,22 +348,24 @@ class _AddChoreSheetState extends State<_AddChoreSheet> {
       return;
     }
     Navigator.pop(context);
-    widget.onAdd(name, _assignedId!);
+    widget.onSave(name, _assignedId!);
   }
 
   @override
   Widget build(BuildContext context) {
+    final editing = widget.initial != null;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text("Yeni görev", style: AppStyles.popupHeader),
+          Text(editing ? "Görevi düzenle" : "Yeni görev", style: AppStyles.popupHeader),
           const SizedBox(height: 16),
           TextField(
             controller: _nameController,
-            autofocus: true,
+            // Düzenlerken klavye hemen açılmasın; çoğu zaman sadece kişi değişir
+            autofocus: !editing,
             maxLength: 255,
             textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(
@@ -371,7 +401,7 @@ class _AddChoreSheetState extends State<_AddChoreSheet> {
               }).toList(),
             ),
           const SizedBox(height: 24),
-          FilledButton(onPressed: _submit, child: const Text("Görevi ekle")),
+          FilledButton(onPressed: _submit, child: Text(editing ? "Kaydet" : "Görevi ekle")),
         ],
       ),
     );

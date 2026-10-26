@@ -95,6 +95,32 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     }
   }
 
+  // Yeni ad ekrana hemen yansır; sunucu reddederse eski ada dönülür.
+  Future<void> _rename(_ShoppingItem item, String name) async {
+    final index = _items.indexOf(item);
+    if (index == -1 || name == item.name) return;
+
+    final updated = item.copyWith(name: name);
+    setState(() => _items[index] = updated);
+
+    final success = await ApiService.renameItem(item.id, name);
+    if (!success && mounted) {
+      setState(() {
+        final i = _items.indexOf(updated);
+        if (i != -1) _items[i] = item;
+      });
+      _showMessage("Ürün adı değiştirilemedi");
+    }
+  }
+
+  Future<void> _showRenameSheet(_ShoppingItem item) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _RenameItemSheet(name: item.name, onSave: (name) => _rename(item, name)),
+    );
+  }
+
   void _delete(_ShoppingItem item) {
     final index = _items.indexOf(item);
     if (index == -1) return;
@@ -195,6 +221,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                                 ),
                                 GroupedCard(dividerIndent: 56, children: done.map(_buildItemRow).toList()),
                               ],
+                              const ListHint("Adını değiştirmek için ürüne basılı tut"),
                             ],
                           ),
                   ),
@@ -254,6 +281,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
       onDismissed: (_) => _delete(item),
       child: ListTile(
         onTap: () => _toggle(item),
+        onLongPress: () => _showRenameSheet(item),
         leading: Checkbox(
           value: item.done,
           activeColor: AppStyles.successColor,
@@ -286,6 +314,62 @@ class _ShoppingItem {
   final String? addedBy;
   const _ShoppingItem({required this.id, required this.name, required this.done, this.addedBy});
 
-  _ShoppingItem copyWith({bool? done}) =>
-      _ShoppingItem(id: id, name: name, done: done ?? this.done, addedBy: addedBy);
+  _ShoppingItem copyWith({String? name, bool? done}) =>
+      _ShoppingItem(id: id, name: name ?? this.name, done: done ?? this.done, addedBy: addedBy);
+}
+
+class _RenameItemSheet extends StatefulWidget {
+  final String name;
+  final ValueChanged<String> onSave;
+
+  const _RenameItemSheet({required this.name, required this.onSave});
+
+  @override
+  State<_RenameItemSheet> createState() => _RenameItemSheetState();
+}
+
+class _RenameItemSheetState extends State<_RenameItemSheet> {
+  late final _controller = TextEditingController(text: widget.name);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _controller.text.trim();
+    if (name.isEmpty) return;
+    Navigator.pop(context);
+    widget.onSave(name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text("Ürünü düzenle", style: AppStyles.popupHeader),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            maxLength: 255,
+            textCapitalization: TextCapitalization.sentences,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.edit_outlined),
+              counterText: "",
+            ),
+            onSubmitted: (_) => _submit(),
+          ),
+          const SizedBox(height: 24),
+          FilledButton(onPressed: _submit, child: const Text("Kaydet")),
+        ],
+      ),
+    );
+  }
 }

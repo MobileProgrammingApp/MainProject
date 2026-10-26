@@ -212,3 +212,22 @@ class GroupedCard extends StatelessWidget {
     );
   }
 }
+
+/// Listenin altında, satırlarla neler yapılabileceğini hatırlatan küçük not.
+class ListHint extends StatelessWidget {
+  final String text;
+
+  const ListHint(this.text, {super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: AppStyles.listTileSubtitle.copyWith(fontSize: 12),
+      ),
+    );
+  }
+}

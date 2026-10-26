@@ -221,6 +221,15 @@ class ApiService {
         "task_name": taskName,
       });
 
+  /// Görevin adını ve/veya sorumlusunu değiştirir; sorumlu değiştiyse sunucu
+  /// yeni kişiye bildirim gönderir.
+  static Future<bool> editChore(int id, String taskName, int assignedToId) =>
+      _postForSuccess("edit_chore.php", {
+        "id": id.toString(),
+        "task_name": taskName,
+        "assigned_to_id": assignedToId.toString(),
+      });
+
   static Future<bool> completeChore(int id) => _postForSuccess("update_chore.php", {"id": id.toString()});
 
   static Future<bool> deleteChore(int id) => _postForSuccess("delete_chore.php", {"id": id.toString()});
@@ -233,6 +242,9 @@ class ApiService {
         "item_name": itemName,
         if (memberId != null) "member_id": memberId.toString(),
       });
+
+  static Future<bool> renameItem(int id, String itemName) =>
+      _postForSuccess("edit_item.php", {"id": id.toString(), "item_name": itemName});
 
   static Future<bool> setItemBought(int id, bool bought) =>
       _postForSuccess("update_item.php", {"id": id.toString(), "is_bought": bought ? "1" : "0"});
