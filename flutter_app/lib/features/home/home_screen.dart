@@ -40,6 +40,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int? activePollId;
   int? votedOptionId;
   int pollMinutesLeft = 0; // anket 24 saat sonra kapanır (sunucu siler)
+  // Sunucudan en az bir kez veri geldi mi? Gelmediyse (ör. internet yok)
+  // "0 iş" / "aktif anket yok" yerine "alınamadı" gösterilir.
+  bool _statsLoaded = false;
+  bool _pollLoaded = false;
 
   @override
   void initState() {
@@ -105,6 +109,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         houseName = stats['house_name'];
         pendingChoresCount = int.parse(stats['pending_chores'].toString());
         pendingShoppingCount = int.parse(stats['pending_items'].toString());
+        _statsLoaded = true;
       }
 
       if (pollData['status'] == 'success') {
@@ -115,9 +120,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         hasVoted = pollData['has_voted'] == true;
         votedOptionId = pollData['voted_option_id'] != null ? int.parse(pollData['voted_option_id'].toString()) : null;
         pollMinutesLeft = int.tryParse('${pollData['minutes_left'] ?? 0}') ?? 0;
-      } else {
+        _pollLoaded = true;
+      } else if (pollData['status'] == 'empty') {
         hasActivePoll = false;
+        _pollLoaded = true;
       }
+      // Bağlantı/sunucu hatasında önceki anket görünümü olduğu gibi kalır
       isLoading = false;
     });
   }
@@ -198,7 +206,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     softColor: AppStyles.primarySoft,
                     count: pendingChoresCount,
                     label: "bekleyen iş",
+                    unavailableLabel: "görevler alınamadı",
                     isLoading: isLoading,
+                    unavailable: !_statsLoaded,
                     onTap: () => widget.onTabChange(1),
                   ),
                 ),
@@ -210,7 +220,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     softColor: AppStyles.accentSoft,
                     count: pendingShoppingCount,
                     label: "alınacak ürün",
+                    unavailableLabel: "liste alınamadı",
                     isLoading: isLoading,
+                    unavailable: !_statsLoaded,
                     onTap: () => widget.onTabChange(2),
                   ),
                 ),
@@ -293,6 +305,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildPollSection() {
+    if (isLoading && !_pollLoaded) {
+      return Container(
+        height: 88,
+        decoration: AppStyles.cardDecoration,
+        alignment: Alignment.center,
+        child: const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
+      );
+    }
+
+    // Anket bilgisi hiç alınamadıysa (ör. internet yok): "aktif anket yok" demeyelim
+    if (!_pollLoaded) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: AppStyles.cardDecoration,
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(color: const Color(0xFFEDEFF3), borderRadius: BorderRadius.circular(14)),
+              child: const Icon(Icons.cloud_off_rounded, color: AppStyles.mutedTextColor),
+            ),
+            const SizedBox(width: 16),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Anket bilgisi alınamadı", style: AppStyles.listTileTitle),
+                  SizedBox(height: 2),
+                  Text("Bağlantı gelince kendiliğinden yenilenir.", style: AppStyles.listTileSubtitle),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: () => _loadHomeData(isSilent: true),
+              child: const Text("Tekrar dene"),
+            ),
+          ],
+        ),
+      );
+    }
+
     // Aktif anket yoksa: oluşturma kartı
     if (!hasActivePoll) {
       return Container(
@@ -508,6 +563,8 @@ class _SummaryCard extends StatelessWidget {
   final int count;
   final String label;
   final bool isLoading;
+  final bool unavailable;
+  final String unavailableLabel;
   final VoidCallback onTap;
 
   const _SummaryCard({
@@ -517,6 +574,8 @@ class _SummaryCard extends StatelessWidget {
     required this.count,
     required this.label,
     required this.isLoading,
+    required this.unavailable,
+    required this.unavailableLabel,
     required this.onTap,
   });
 
@@ -545,10 +604,10 @@ class _SummaryCard extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Text(
-                isLoading ? "–" : "$count",
+                isLoading || unavailable ? "–" : "$count",
                 style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppStyles.textColor),
               ),
-              Text(label, style: AppStyles.listTileSubtitle),
+              Text(!isLoading && unavailable ? unavailableLabel : label, style: AppStyles.listTileSubtitle),
             ],
           ),
         ),

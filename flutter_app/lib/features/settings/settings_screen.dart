@@ -242,6 +242,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 14),
           if (isLoading)
             const Center(child: Padding(padding: EdgeInsets.all(8), child: CircularProgressIndicator()))
+          else if (houseMembers.isEmpty && ApiService.offline.value)
+            // Kişiler yüklenemedi: "önce kişi ekle" demek yanıltıcı olur
+            Row(
+              children: [
+                const Icon(Icons.cloud_off_rounded, color: AppStyles.mutedTextColor, size: 20),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text("Kişiler yüklenemedi, internet bağlantını kontrol et.", style: AppStyles.listTileSubtitle),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() => isLoading = true);
+                    _loadSettings();
+                  },
+                  child: const Text("Tekrar dene"),
+                ),
+              ],
+            )
           else if (houseMembers.isEmpty)
             OutlinedButton.icon(
               onPressed: () => _open(const ManageHomeScreen()).then((_) => _loadSettings()),

@@ -13,6 +13,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = true;
+  bool _loaded = false; // sunucudan bilgiler geldi mi (internet yoksa gelmez)
   String _houseName = '';
   String _email = '';
 
@@ -29,6 +30,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (data['status'] == 'success') {
         _houseName = data['house_name'] ?? '';
         _email = data['email'] ?? '';
+        _loaded = true;
       }
       _isLoading = false;
     });
@@ -40,56 +42,115 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: PageHeader(
         icon: Icons.person_rounded,
         title: "Profil",
-        subtitle: _isLoading ? null : _email,
+        subtitle: _isLoading ? null : (_loaded ? _email : "Bağlantı yok"),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-              children: [
-                const SectionHeader(title: "Ev hesabı"),
-                GroupedCard(
-                  dividerIndent: 72,
-                  children: [
-                    _infoTile(Icons.home_outlined, "Ev adı", _houseName),
-                    _infoTile(Icons.email_outlined, "Ortak e-posta", _email),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                const SectionHeader(title: "Güvenlik"),
-                Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
-                    leading: _badge(Icons.lock_outline_rounded),
-                    title: const Text('Şifre değiştir', style: AppStyles.listTileTitle),
-                    subtitle: const Text("Diğer cihazlarda yeniden giriş gerekir"),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: AppStyles.mutedTextColor),
-                    onTap: _showChangePasswordSheet,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
-                    leading: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(color: const Color(0xFFFBE6E6), borderRadius: BorderRadius.circular(12)),
-                      child: const Icon(Icons.delete_forever_outlined, color: AppStyles.deleteColor, size: 22),
+          : RefreshIndicator(
+              onRefresh: _loadProfile,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                children: [
+                  const SectionHeader(title: "Ev hesabı"),
+                  if (_loaded)
+                    GroupedCard(
+                      dividerIndent: 72,
+                      children: [
+                        _infoTile(Icons.home_outlined, "Ev adı", _houseName),
+                        _infoTile(
+                          Icons.email_outlined,
+                          "Ortak e-posta",
+                          _email,
+                        ),
+                      ],
+                    )
+                  else
+                    Card(
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                        leading: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEDEFF3),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.cloud_off_rounded,
+                            color: AppStyles.mutedTextColor,
+                            size: 22,
+                          ),
+                        ),
+                        title: const Text(
+                          "Hesap bilgileri alınamadı",
+                          style: AppStyles.listTileTitle,
+                        ),
+                        subtitle: const Text(
+                          "İnternet bağlantını kontrol edip aşağı çekerek yenile.",
+                        ),
+                      ),
                     ),
-                    title: const Text('Hesabı sil',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppStyles.deleteColor)),
-                    subtitle: const Text("Ev hesabı ve tüm veriler kalıcı olarak silinir"),
-                    onTap: () => showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (_) => _DeleteAccountSheet(houseName: _houseName),
+                  const SizedBox(height: 24),
+                  const SectionHeader(title: "Güvenlik"),
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
+                      leading: _badge(Icons.lock_outline_rounded),
+                      title: const Text(
+                        'Şifre değiştir',
+                        style: AppStyles.listTileTitle,
+                      ),
+                      subtitle: const Text(
+                        "Diğer cihazlarda yeniden giriş gerekir",
+                      ),
+                      trailing: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: AppStyles.mutedTextColor,
+                      ),
+                      onTap: _showChangePasswordSheet,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
+                      leading: Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFBE6E6),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.delete_forever_outlined,
+                          color: AppStyles.deleteColor,
+                          size: 22,
+                        ),
+                      ),
+                      title: const Text(
+                        'Hesabı sil',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppStyles.deleteColor,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        "Ev hesabı ve tüm veriler kalıcı olarak silinir",
+                      ),
+                      onTap: () => showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        builder: (_) => _DeleteAccountSheet(
+                          houseName: _loaded ? _houseName : "",
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
     );
   }
@@ -98,7 +159,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       width: 42,
       height: 42,
-      decoration: BoxDecoration(color: AppStyles.primarySoft, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: AppStyles.primarySoft,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Icon(icon, color: AppStyles.primaryColor, size: 22),
     );
   }
@@ -143,7 +207,8 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     super.dispose();
   }
 
-  void _message(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _message(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _submit() async {
     if (_current.text.isEmpty || _new.text.isEmpty) {
@@ -175,7 +240,12 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
     }
   }
 
-  Widget _field(TextEditingController c, String hint, IconData icon, {bool last = false}) {
+  Widget _field(
+    TextEditingController c,
+    String hint,
+    IconData icon, {
+    bool last = false,
+  }) {
     return TextField(
       controller: c,
       obscureText: _obscure,
@@ -188,17 +258,28 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
-              const Expanded(child: Text('Şifre değiştir', style: AppStyles.popupHeader)),
+              const Expanded(
+                child: Text('Şifre değiştir', style: AppStyles.popupHeader),
+              ),
               IconButton(
                 tooltip: _obscure ? "Şifreleri göster" : "Şifreleri gizle",
-                icon: Icon(_obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                icon: Icon(
+                  _obscure
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
+                ),
                 onPressed: () => setState(() => _obscure = !_obscure),
               ),
             ],
@@ -206,14 +287,30 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
           const SizedBox(height: 12),
           _field(_current, 'Mevcut şifre', Icons.lock_outline_rounded),
           const SizedBox(height: 12),
-          _field(_new, 'Yeni şifre (en az 8 karakter)', Icons.lock_reset_rounded),
+          _field(
+            _new,
+            'Yeni şifre (en az 8 karakter)',
+            Icons.lock_reset_rounded,
+          ),
           const SizedBox(height: 12),
-          _field(_confirm, 'Yeni şifre (tekrar)', Icons.lock_reset_rounded, last: true),
+          _field(
+            _confirm,
+            'Yeni şifre (tekrar)',
+            Icons.lock_reset_rounded,
+            last: true,
+          ),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _saving ? null : _submit,
             child: _saving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
                 : const Text('Kaydet'),
           ),
         ],
@@ -243,7 +340,9 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
 
   Future<void> _delete() async {
     if (_password.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Şifreni gir")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Şifreni gir")));
       return;
     }
     setState(() => _deleting = true);
@@ -270,7 +369,12 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        20,
+        20,
+        MediaQuery.viewInsetsOf(context).bottom + 20,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -279,9 +383,12 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: const Color(0xFFFBE6E6), borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFBE6E6),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Text(
-              "\"${widget.houseName}\" ev hesabı; ev üyeleri, görevler, market listesi, ev bilgileri ve "
+              "${widget.houseName.isEmpty ? "Bu ev hesabı" : "\"${widget.houseName}\" ev hesabı"}; ev üyeleri, görevler, market listesi, ev bilgileri ve "
               "anketlerle birlikte kalıcı olarak silinir. Bu hesabı kullanan bütün aile üyeleri "
               "oturumdan çıkar. Bu işlem geri alınamaz.",
               style: const TextStyle(color: AppStyles.textColor),
@@ -291,18 +398,33 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
           TextField(
             controller: _password,
             obscureText: true,
-            decoration: const InputDecoration(hintText: "Onaylamak için şifren", prefixIcon: Icon(Icons.lock_outline_rounded)),
+            decoration: const InputDecoration(
+              hintText: "Onaylamak için şifren",
+              prefixIcon: Icon(Icons.lock_outline_rounded),
+            ),
             onSubmitted: (_) => _delete(),
           ),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: _deleting ? null : _delete,
-            style: FilledButton.styleFrom(backgroundColor: AppStyles.deleteColor),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppStyles.deleteColor,
+            ),
             child: _deleting
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
                 : const Text("Hesabı kalıcı olarak sil"),
           ),
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Vazgeç")),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Vazgeç"),
+          ),
         ],
       ),
     );
