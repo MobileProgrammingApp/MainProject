@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_service.dart';
 import '../../core/app_theme.dart';
 import '../../core/widgets/page_header.dart';
+import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -65,6 +66,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     subtitle: const Text("Diğer cihazlarda yeniden giriş gerekir"),
                     trailing: const Icon(Icons.chevron_right_rounded, color: AppStyles.mutedTextColor),
                     onTap: _showChangePasswordSheet,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
+                    leading: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(color: const Color(0xFFFBE6E6), borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.delete_forever_outlined, color: AppStyles.deleteColor, size: 22),
+                    ),
+                    title: const Text('Hesabı sil',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppStyles.deleteColor)),
+                    subtitle: const Text("Ev hesabı ve tüm veriler kalıcı olarak silinir"),
+                    onTap: () => showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      builder: (_) => _DeleteAccountSheet(houseName: _houseName),
+                    ),
                   ),
                 ),
               ],
@@ -194,6 +216,93 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Text('Kaydet'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Hesap silme onayı: ne silineceğini açıkça söyler, şifre ister.
+class _DeleteAccountSheet extends StatefulWidget {
+  final String houseName;
+  const _DeleteAccountSheet({required this.houseName});
+
+  @override
+  State<_DeleteAccountSheet> createState() => _DeleteAccountSheetState();
+}
+
+class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
+  final _password = TextEditingController();
+  bool _deleting = false;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _delete() async {
+    if (_password.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Şifreni gir")));
+      return;
+    }
+    setState(() => _deleting = true);
+    final result = await ApiService.deleteAccount(_password.text);
+    if (!mounted) return;
+
+    if (result['status'] == 'success') {
+      // Oturum ApiService.deleteAccount içinde temizlendi; giriş ekranına dön
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['message'] ?? "Hesabın silindi")),
+      );
+    } else {
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['message'] ?? "Hesap silinemedi")),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Text('Hesabı sil', style: AppStyles.popupHeader),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: const Color(0xFFFBE6E6), borderRadius: BorderRadius.circular(12)),
+            child: Text(
+              "\"${widget.houseName}\" ev hesabı; ev üyeleri, görevler, market listesi, ev bilgileri ve "
+              "anketlerle birlikte kalıcı olarak silinir. Bu hesabı kullanan bütün aile üyeleri "
+              "oturumdan çıkar. Bu işlem geri alınamaz.",
+              style: const TextStyle(color: AppStyles.textColor),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _password,
+            obscureText: true,
+            decoration: const InputDecoration(hintText: "Onaylamak için şifren", prefixIcon: Icon(Icons.lock_outline_rounded)),
+            onSubmitted: (_) => _delete(),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: _deleting ? null : _delete,
+            style: FilledButton.styleFrom(backgroundColor: AppStyles.deleteColor),
+            child: _deleting
+                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text("Hesabı kalıcı olarak sil"),
+          ),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Vazgeç")),
         ],
       ),
     );

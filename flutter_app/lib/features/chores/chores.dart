@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api_service.dart';
 import '../../core/app_theme.dart';
+import '../../core/undo_delete.dart';
 import '../../core/widgets/page_header.dart';
 import '../home/manage_home_screen.dart';
 
@@ -85,12 +86,34 @@ class _ChoresScreenState extends State<ChoresScreen> {
     }
   }
 
-  Future<void> _delete(_Chore chore) async {
+  void _delete(_Chore chore) {
+    final index = _chores.indexOf(chore);
+    if (index == -1) return;
     // Kaydırarak silinen öğe hemen listeden çıkmalı (Dismissible bunu bekler)
-    setState(() => _chores.remove(chore));
-    final success = await ApiService.deleteChore(chore.id);
-    if (!success && mounted) {
-      _showMessage("Görev silinemedi");
+    setState(() => _chores.removeAt(index));
+
+    deleteWithUndo(
+      context: context,
+      message: "\"${chore.name}\" silindi",
+      onUndo: () {
+        if (mounted) setState(() => _chores.insert(index.clamp(0, _chores.length), chore));
+      },
+      commit: () => ApiService.deleteChore(chore.id),
+      onCommitFailed: () {
+        if (!mounted) return;
+        _showMessage("Görev silinemedi");
+        _fetchChores();
+      },
+    );
+  }
+
+  Future<void> _clearDone() async {
+    final done = _chores.where((c) => c.done).toList();
+    setState(() => _chores.removeWhere((c) => c.done));
+
+    final results = await Future.wait(done.map((c) => ApiService.deleteChore(c.id)));
+    if (results.contains(false) && mounted) {
+      _showMessage("Bazı görevler silinemedi");
       await _fetchChores();
     }
   }
@@ -119,7 +142,9 @@ class _ChoresScreenState extends State<ChoresScreen> {
         title: "Ev işleri",
         subtitle: _isLoading
             ? null
-            : (pending.isEmpty ? "Bekleyen görev yok" : "${pending.length} görev bekliyor"),
+            : (ApiService.offline.value && _chores.isEmpty)
+                ? "Bağlantı yok"
+                : (pending.isEmpty ? "Bekleyen görev yok" : "${pending.length} görev bekliyor"),
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: "btn_add_chore",
@@ -131,7 +156,9 @@ class _ChoresScreenState extends State<ChoresScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadData,
-              child: _chores.isEmpty
+              child: _chores.isEmpty && ApiService.offline.value
+                  ? const EmptyState.offline()
+                  : _chores.isEmpty
                   ? const EmptyState(
                       icon: Icons.task_alt_rounded,
                       title: "Henüz görev yok",
@@ -148,7 +175,16 @@ class _ChoresScreenState extends State<ChoresScreen> {
                           GroupedCard(dividerIndent: 72, children: pending.map(_buildPendingRow).toList()),
                         if (done.isNotEmpty) ...[
                           const SizedBox(height: 24),
-                          SectionHeader(title: "Tamamlananlar", count: done.length),
+                          SectionHeader(
+                            title: "Tamamlananlar",
+                            count: done.length,
+                            action: TextButton.icon(
+                              onPressed: _clearDone,
+                              icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                              label: const Text("Temizle"),
+                              style: TextButton.styleFrom(foregroundColor: AppStyles.mutedTextColor),
+                            ),
+                          ),
                           GroupedCard(dividerIndent: 72, children: done.map(_buildDoneRow).toList()),
                         ],
                       ],

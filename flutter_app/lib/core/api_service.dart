@@ -36,7 +36,22 @@ class ApiService {
     };
   }
 
-  static http.Response _checkAuth(http.Response response) {
+  /// Sunucuya ulaşılamıyor mu (internet yok / zaman aşımı)? Uygulama altta
+  /// uyarı gösterir; boş liste ekranları "liste boş" yerine bağlantı hatası der.
+  /// İlk başarılı istekte kendiliğinden kapanır.
+  static final ValueNotifier<bool> offline = ValueNotifier(false);
+
+  // Tüm istekler buradan geçer: zaman aşımı, bağlantı durumu ve 401 kontrolü
+  static Future<http.Response> _send(Future<http.Response> Function() request) async {
+    final http.Response response;
+    try {
+      response = await request().timeout(_timeout);
+    } on Exception {
+      // SocketException, TimeoutException, http.ClientException: sunucuya ulaşılamadı
+      offline.value = true;
+      rethrow;
+    }
+    offline.value = false;
     if (response.statusCode == 401) {
       Session.expire();
     }
@@ -45,26 +60,18 @@ class ApiService {
 
   static Future<http.Response> _get(String path, [Map<String, String>? query]) async {
     final uri = Uri.parse("$baseUrl/$path").replace(queryParameters: query);
-    final response = await http.get(uri, headers: await _headers()).timeout(_timeout);
-    return _checkAuth(response);
+    final headers = await _headers();
+    return _send(() => http.get(uri, headers: headers));
   }
 
   static Future<http.Response> _post(String path, Map<String, String> body) async {
-    final response = await http
-        .post(Uri.parse("$baseUrl/$path"), headers: await _headers(), body: body)
-        .timeout(_timeout);
-    return _checkAuth(response);
+    final headers = await _headers();
+    return _send(() => http.post(Uri.parse("$baseUrl/$path"), headers: headers, body: body));
   }
 
   static Future<http.Response> _postJson(String path, Map<String, dynamic> body) async {
-    final response = await http
-        .post(
-          Uri.parse("$baseUrl/$path"),
-          headers: await _headers({"Content-Type": "application/json"}),
-          body: json.encode(body),
-        )
-        .timeout(_timeout);
-    return _checkAuth(response);
+    final headers = await _headers({"Content-Type": "application/json"});
+    return _send(() => http.post(Uri.parse("$baseUrl/$path"), headers: headers, body: json.encode(body)));
   }
 
   static Map<String, dynamic> _decodeMap(http.Response response) {
@@ -140,6 +147,20 @@ class ApiService {
 
   static Future<Map<String, dynamic>> forgotPassword(String email) =>
       _postForMessage("forgot_password.php", {"email": email});
+
+  /// Doğrulama maili gelmeyen hesaplar için yeni bağlantı gönderir.
+  static Future<Map<String, dynamic>> resendVerification(String email) =>
+      _postForMessage("resend_verification.php", {"email": email});
+
+  /// Ev hesabını ve tüm verileri kalıcı olarak siler (şifre onayıyla).
+  /// Başarılıysa cihazdaki oturum da temizlenir.
+  static Future<Map<String, dynamic>> deleteAccount(String password) async {
+    final data = await _postForMessage("delete_account.php", {"password": password});
+    if (data['status'] == 'success') {
+      await Session.clear();
+    }
+    return data;
+  }
 
   static Future<Map<String, dynamic>> register(String houseName, String email, String password) =>
       _postForMessage("register.php", {"house_name": houseName, "email": email, "password": password});

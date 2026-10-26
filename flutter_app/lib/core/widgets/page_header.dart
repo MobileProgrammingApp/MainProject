@@ -158,6 +158,15 @@ class EmptyState extends StatelessWidget {
     this.softColor = AppStyles.primarySoft,
   });
 
+  /// Liste sunucuya ulaşılamadığı için boşsa: "liste boş" demek kullanıcıya
+  /// verilerinin silindiğini düşündürür.
+  const EmptyState.offline({super.key})
+      : icon = Icons.cloud_off_rounded,
+        title = "Bağlantı kurulamadı",
+        message = "İnternet bağlantını kontrol edip\naşağı çekerek yenile.",
+        color = AppStyles.mutedTextColor,
+        softColor = const Color(0xFFEDEFF3);
+
   @override
   Widget build(BuildContext context) {
     return ListView(

@@ -23,6 +23,7 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
   List<dynamic> _infos = [];
   List<dynamic> _inventory = [];
   bool _isLoading = true;
+  final Set<int> _revealed = {}; // gösterilen gizli bilgiler (şifre, kod...)
 
   @override
   void initState() {
@@ -118,7 +119,11 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
       appBar: PageHeader(
         icon: Icons.home_rounded,
         title: "Ev bilgileri",
-        subtitle: _isLoading ? null : "${_infos.length} bilgi • ${_inventory.length} eşya",
+        subtitle: _isLoading
+            ? null
+            : (ApiService.offline.value && _infos.isEmpty && _inventory.isEmpty)
+                ? "Bağlantı yok"
+                : "${_infos.length} bilgi • ${_inventory.length} eşya",
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -163,7 +168,14 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
     return Icons.info_outline_rounded;
   }
 
+  // Şifre, kod gibi bilgiler telefon başkasına gösterilirken görünmesin
+  bool _isSecret(String title) {
+    final t = title.toLowerCase();
+    return ['şifre', 'sifre', 'parola', 'kod', 'pin', 'wifi', 'wi-fi', 'password'].any(t.contains);
+  }
+
   Widget _buildInfoList() {
+    if (_infos.isEmpty && ApiService.offline.value) return const EmptyState.offline();
     if (_infos.isEmpty) {
       return const EmptyState(
         icon: Icons.info_outline_rounded,
@@ -178,14 +190,23 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
           dividerIndent: 72,
           children: _infos.map((info) {
             final value = info['value'].toString();
+            final id = int.parse(info['id'].toString());
+            final hidden = _isSecret(info['title'].toString()) && !_revealed.contains(id);
             return ListTile(
               contentPadding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
               leading: _iconBadge(_iconForTitle(info['title'].toString()), AppStyles.primaryColor, AppStyles.primarySoft),
               title: Text(info['title'].toString(), style: AppStyles.listTileSubtitle),
-              subtitle: Text(value, style: AppStyles.listTileTitle),
+              subtitle: Text(hidden ? "••••••••" : value, style: AppStyles.listTileTitle),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (_isSecret(info['title'].toString()))
+                    IconButton(
+                      tooltip: hidden ? "Göster" : "Gizle",
+                      icon: Icon(hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                          size: 20, color: AppStyles.primaryColor),
+                      onPressed: () => setState(() => hidden ? _revealed.add(id) : _revealed.remove(id)),
+                    ),
                   IconButton(
                     tooltip: "Kopyala",
                     icon: const Icon(Icons.copy_rounded, size: 20, color: AppStyles.primaryColor),
@@ -199,7 +220,7 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
                   IconButton(
                     tooltip: "Sil",
                     icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
-                    onPressed: () => _delete(int.parse(info['id'].toString()), true),
+                    onPressed: () => _delete(id, true),
                   ),
                 ],
               ),
@@ -211,6 +232,7 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
   }
 
   Widget _buildInventoryList() {
+    if (_inventory.isEmpty && ApiService.offline.value) return const EmptyState.offline();
     if (_inventory.isEmpty) {
       return const EmptyState(
         icon: Icons.inventory_2_outlined,

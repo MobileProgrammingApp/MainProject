@@ -22,10 +22,22 @@ class NotificationService {
     importance: Importance.high,
   );
 
+  /// Bildirime dokunulunca açılacak ekran ('home' / 'chores' / 'shopping').
+  /// Sunucu bunu bildirimin "screen" verisinde gönderir; AppScaffold dinler.
+  static final ValueNotifier<String?> requestedScreen = ValueNotifier(null);
+
+  static void _open(String? screen) {
+    if (screen != null && screen.isNotEmpty) requestedScreen.value = screen;
+  }
+
   static Future<void> initialize() async {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const initSettings = InitializationSettings(android: androidInit);
-    await _localNotifications.initialize(initSettings);
+    // Uygulama açıkken gösterdiğimiz bildirime dokunulursa
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (response) => _open(response.payload),
+    );
 
     await _localNotifications
         .resolvePlatformSpecificImplementation<
@@ -40,6 +52,11 @@ class NotificationService {
 
     FirebaseMessaging.onMessage.listen(_showForegroundNotification);
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+    // Uygulama arka plandayken / kapalıyken bildirime dokunulursa
+    FirebaseMessaging.onMessageOpenedApp.listen((message) => _open(message.data['screen']));
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) _open(initialMessage.data['screen']);
 
     FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
       if (await _isEnabled()) {
@@ -80,6 +97,7 @@ class NotificationService {
       notification.title,
       notification.body,
       details,
+      payload: message.data['screen'],
     );
   }
 

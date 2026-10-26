@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../auth/login_screen.dart';
 import '../notifications/notifications_screen.dart';
@@ -152,6 +154,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 24),
+          const SectionHeader(title: "Hakkında"),
+          GroupedCard(
+            dividerIndent: 72,
+            children: [
+              ListTile(
+                contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
+                leading: _badge(Icons.privacy_tip_outlined, AppStyles.primaryColor, AppStyles.primarySoft),
+                title: const Text("Gizlilik politikası", style: AppStyles.listTileTitle),
+                trailing: const Icon(Icons.open_in_new_rounded, size: 20, color: AppStyles.mutedTextColor),
+                onTap: _openPrivacyPolicy,
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                leading: _badge(Icons.info_outline_rounded, AppStyles.primaryColor, AppStyles.primarySoft),
+                title: const Text("Sürüm", style: AppStyles.listTileTitle),
+                trailing: FutureBuilder<PackageInfo>(
+                  future: PackageInfo.fromPlatform(),
+                  builder: (context, snapshot) => Text(
+                    snapshot.hasData ? "${snapshot.data!.version} (${snapshot.data!.buildNumber})" : "",
+                    style: AppStyles.listTileSubtitle,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
           Card(
             clipBehavior: Clip.antiAlias,
             child: ListTile(
@@ -168,6 +196,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _open(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  Future<void> _openPrivacyPolicy() async {
+    final opened = await launchUrl(
+      Uri.parse("${ApiService.baseUrl}/privacy.html"),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Tarayıcı açılamadı")));
+    }
+  }
 
   Widget _badge(IconData icon, Color color, Color soft) {
     return Container(

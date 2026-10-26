@@ -99,7 +99,11 @@ class _ManageHomeScreenState extends State<ManageHomeScreen> {
       appBar: PageHeader(
         icon: Icons.people_alt_rounded,
         title: "Ev üyeleri",
-        subtitle: _isLoading ? null : (_members.isEmpty ? "Henüz kimse yok" : "${_members.length} kişi"),
+        subtitle: _isLoading
+            ? null
+            : (ApiService.offline.value && _members.isEmpty)
+                ? "Bağlantı yok"
+                : (_members.isEmpty ? "Henüz kimse yok" : "${_members.length} kişi"),
       ),
       floatingActionButton: FloatingActionButton.extended(
         heroTag: "btn_add_member",
@@ -111,7 +115,9 @@ class _ManageHomeScreenState extends State<ManageHomeScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _load,
-              child: _members.isEmpty
+              child: _members.isEmpty && ApiService.offline.value
+                  ? const EmptyState.offline()
+                  : _members.isEmpty
                   ? const EmptyState(
                       icon: Icons.people_alt_outlined,
                       title: "Henüz kimse eklenmemiş",

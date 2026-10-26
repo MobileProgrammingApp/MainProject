@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api_service.dart';
 import '../../core/app_theme.dart';
+import '../../core/undo_delete.dart';
 import '../../core/widgets/page_header.dart';
 
 class ShoppingScreen extends StatefulWidget {
@@ -13,6 +14,7 @@ class ShoppingScreen extends StatefulWidget {
 
 class _ShoppingScreenState extends State<ShoppingScreen> {
   final List<_ShoppingItem> _items = [];
+  Map<String, String> _memberNames = {}; // "Ekleyen: ..." için üye id -> ad
   final TextEditingController _controller = TextEditingController();
   final FocusNode _inputFocus = FocusNode();
 
@@ -38,16 +40,18 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
   // ==========================================
 
   Future<void> _fetchItems() async {
-    final data = await ApiService.getItems();
+    final results = await Future.wait([ApiService.getItems(), ApiService.getFamilyMembers(0)]);
     if (!mounted) return;
 
     setState(() {
+      _memberNames = {for (final m in results[1]) m['id'].toString(): m['name'].toString()};
       _items
         ..clear()
-        ..addAll(data.map((item) => _ShoppingItem(
+        ..addAll(results[0].map((item) => _ShoppingItem(
               id: int.parse(item['id'].toString()),
               name: item['item_name'],
               done: item['is_bought'] == 1 || item['is_bought'] == "1",
+              addedBy: _memberNames[item['added_by_member_id']?.toString()],
             )));
       _isLoading = false;
     });
@@ -91,15 +95,25 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
     }
   }
 
-  Future<void> _delete(_ShoppingItem item) async {
+  void _delete(_ShoppingItem item) {
+    final index = _items.indexOf(item);
+    if (index == -1) return;
     // Kaydırarak silinen öğe hemen listeden çıkmalı (Dismissible bunu bekler)
-    setState(() => _items.remove(item));
+    setState(() => _items.removeAt(index));
 
-    final success = await ApiService.deleteItem(item.id);
-    if (!success && mounted) {
-      _showMessage("Silinemedi");
-      await _fetchItems();
-    }
+    deleteWithUndo(
+      context: context,
+      message: "\"${item.name}\" silindi",
+      onUndo: () {
+        if (mounted) setState(() => _items.insert(index.clamp(0, _items.length), item));
+      },
+      commit: () => ApiService.deleteItem(item.id),
+      onCommitFailed: () {
+        if (!mounted) return;
+        _showMessage("Silinemedi");
+        _fetchItems();
+      },
+    );
   }
 
   Future<void> _clearBought() async {
@@ -132,7 +146,9 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
         title: "Market listesi",
         subtitle: _isLoading
             ? null
-            : _items.isEmpty
+            : (ApiService.offline.value && _items.isEmpty)
+                ? "Bağlantı yok"
+                : _items.isEmpty
                 ? "Liste boş"
                 : pending.isEmpty
                     ? "Her şey alındı"
@@ -146,7 +162,9 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: _fetchItems,
-                    child: _items.isEmpty
+                    child: _items.isEmpty && ApiService.offline.value
+                        ? const EmptyState.offline()
+                        : _items.isEmpty
                         ? const EmptyState(
                             icon: Icons.shopping_basket_outlined,
                             title: "Liste boş",
@@ -250,6 +268,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
             color: item.done ? AppStyles.mutedTextColor : AppStyles.textColor,
           ),
         ),
+        subtitle: item.addedBy == null ? null : Text("Ekleyen: ${item.addedBy}"),
         trailing: IconButton(
           tooltip: "Sil",
           icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
@@ -264,7 +283,9 @@ class _ShoppingItem {
   final int id;
   final String name;
   final bool done;
-  const _ShoppingItem({required this.id, required this.name, required this.done});
+  final String? addedBy;
+  const _ShoppingItem({required this.id, required this.name, required this.done, this.addedBy});
 
-  _ShoppingItem copyWith({bool? done}) => _ShoppingItem(id: id, name: name, done: done ?? this.done);
+  _ShoppingItem copyWith({bool? done}) =>
+      _ShoppingItem(id: id, name: name, done: done ?? this.done, addedBy: addedBy);
 }

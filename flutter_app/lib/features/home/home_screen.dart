@@ -39,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool hasVoted = false;
   int? activePollId;
   int? votedOptionId;
+  int pollMinutesLeft = 0; // anket 24 saat sonra kapanır (sunucu siler)
 
   @override
   void initState() {
@@ -113,6 +114,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         pollOptions = pollData['options'];
         hasVoted = pollData['has_voted'] == true;
         votedOptionId = pollData['voted_option_id'] != null ? int.parse(pollData['voted_option_id'].toString()) : null;
+        pollMinutesLeft = int.tryParse('${pollData['minutes_left'] ?? 0}') ?? 0;
       } else {
         hasActivePoll = false;
       }
@@ -215,7 +217,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ],
             ),
             const SizedBox(height: 24),
-            const SectionHeader(title: "Ev anketi"),
+            SectionHeader(
+              title: "Ev anketi",
+              action: hasActivePoll
+                  ? TextButton.icon(
+                      onPressed: _confirmReplacePoll,
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text("Yeni anket"),
+                    )
+                  : null,
+            ),
             _buildPollSection(),
             const SizedBox(height: 24),
             const SectionHeader(title: "Kısayollar"),
@@ -346,7 +357,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 4),
           Text(
-            hasVoted ? "$totalVotes oy kullanıldı" : "Oy vermek için bir seçeneğe dokunun",
+            "${hasVoted ? "$totalVotes oy kullanıldı" : "Oy vermek için bir seçeneğe dokunun"} • $_timeLeft",
             style: AppStyles.listTileSubtitle,
           ),
           const SizedBox(height: 16),
@@ -394,6 +405,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   // Anket oluşturma penceresi
+  String get _timeLeft {
+    if (pollMinutesLeft >= 60) return "${pollMinutesLeft ~/ 60} saat sonra kapanır";
+    if (pollMinutesLeft > 0) return "$pollMinutesLeft dakika sonra kapanır";
+    return "kapanmak üzere";
+  }
+
+  // Evde tek aktif anket olur; yenisi açılınca eskisi ve oyları silinir
+  Future<void> _confirmReplacePoll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Yeni anket başlatılsın mı?"),
+        content: Text("\"$pollQuestion\" anketi ve verilen oylar silinecek."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Vazgeç")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Yeni anket")),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) _showCreatePollDialog();
+  }
+
   void _showCreatePollDialog() {
     final questionCtrl = TextEditingController();
     final optionCtrls = [TextEditingController(), TextEditingController()];
@@ -410,6 +443,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text("Yeni anket", style: AppStyles.popupHeader),
+                const SizedBox(height: 4),
+                const Text("Anket 24 saat açık kalır; evdeki herkese bildirim gider.", style: AppStyles.listTileSubtitle),
                 const SizedBox(height: 16),
                 TextField(
                   controller: questionCtrl,

@@ -58,10 +58,24 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } else {
       if (!mounted) return;
+      final notVerified = result['code'] == 'email_not_verified';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message'] ?? "Giriş başarısız")),
+        SnackBar(
+          content: Text(result['message'] ?? "Giriş başarısız"),
+          // Doğrulama maili gelmediyse (ör. spam'e düştüyse) yenisini iste
+          duration: notVerified ? const Duration(seconds: 8) : const Duration(seconds: 4),
+          action: notVerified
+              ? SnackBarAction(label: "Tekrar gönder", onPressed: _resendVerification)
+              : null,
+        ),
       );
     }
+  }
+
+  Future<void> _resendVerification() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final result = await ApiService.resendVerification(_emailController.text.trim());
+    messenger.showSnackBar(SnackBar(content: Text(result['message'] ?? "Bir hata oluştu")));
   }
 
   @override
