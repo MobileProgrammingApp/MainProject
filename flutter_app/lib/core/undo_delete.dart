@@ -20,6 +20,9 @@ void deleteWithUndo({
       .showSnackBar(SnackBar(
         content: Text(message),
         duration: const Duration(seconds: 4),
+        // Düğmeli SnackBar'lar varsayılan olarak kendiliğinden kapanmıyor;
+        // kapanmazsa silme hiç kesinleşmez
+        persist: false,
         action: SnackBarAction(label: "Geri al", onPressed: onUndo),
       ))
       .closed

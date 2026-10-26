@@ -64,6 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
           content: Text(result['message'] ?? "Giriş başarısız"),
           // Doğrulama maili gelmediyse (ör. spam'e düştüyse) yenisini iste
           duration: notVerified ? const Duration(seconds: 8) : const Duration(seconds: 4),
+          persist: false,
           action: notVerified
               ? SnackBarAction(label: "Tekrar gönder", onPressed: _resendVerification)
               : null,
