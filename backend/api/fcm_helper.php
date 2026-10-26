@@ -23,7 +23,13 @@ function sendFCMNotificationV1($projectId, $keyFilePath, $targetToken, $title, $
                 "priority" => "high",
                 "notification" => [
                     "sound" => "default",
-                    "click_action" => "FLUTTER_NOTIFICATION_CLICK"
+                    // Uygulamanın kendi yüksek öncelikli kanalı (NotificationService
+                    // oluşturur); yoksa Android varsayılan kanala düşer.
+                    "channel_id" => "homepal_default_channel",
+                    // click_action BİLEREK yok: firebase_messaging dokunmayı uygulamanın
+                    // açılış ekranından bekler. Eskiden gönderilen
+                    // "FLUTTER_NOTIFICATION_CLICK" hiçbir ekrana karşılık gelmediği için
+                    // uygulama kapalı/arka plandayken bildirime dokunmak işe yaramıyordu.
                 ]
             ]
         ]
