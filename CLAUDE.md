@@ -17,6 +17,9 @@ Flutter mobil uygulaması (ev/ev arkadaşları için görev, market listesi, ev 
 - DB şema değişikliklerinde: otomatik migration sistemi yok. Değişiklik `backend/migrations/YYYY-MM-DD_ad.sql` olarak eklenir (`.gitignore`'daki `*.sql` kuralından muaf), deploy'dan hemen sonra sunucuda bir kez `sudo mysql homepal_db < backend/migrations/...sql` ile çalıştırılır; `backend/schema.sql` de güncellenir.
 - Nginx (`/etc/nginx/sites-enabled/homepal.swordarchitecture.com`): web kökü `backend/api/` olduğu için `.env`, `keys/`, `*.json|sql|lock|env|md|log|bak` dışarı verilmiyor; HSTS ve güvenlik başlıkları burada. Web köküne asla gizli dosya koymayın.
 - Cron: `cleanup_polls.php` (sadece CLI) eski anketleri, deneme sınırı kayıtlarını ve 180 gün kullanılmayan oturumları temizler.
+- Yedek: `/usr/local/sbin/homepal-backup.sh` her gece 03:30 UTC'de (`/etc/cron.d/homepal-backup`) `homepal_db`'yi gzip'li olarak `/var/backups/homepal/` altına döker, 14 günden eskileri siler; log `/var/log/homepal_backup.log`. Yedekler aynı sunucuda duruyor, ara ara bilgisayara (OneDrive dışına, gerçek kullanıcı verisi) indirin.
+- SSH: sadece anahtarla giriş (`/etc/ssh/sshd_config.d/01-homepal.conf`; `50-cloud-init.conf` şifreyi açtığı için ondan önce okunan bir dosyada). `authorized_keys`'te web sitesinin `github-actions` deploy anahtarı da var, silmeyin. Erişim kaybolursa IONOS panelindeki web konsolu SSH'den bağımsız çalışır.
+- Aynı sunucuda geliştiricinin web sitesi de var (`swordarchitecture.com`, Nginx → Node :3000; 3000 portu dışarıya IONOS güvenlik duvarıyla kapalı). Sunucu yeniden başlatma onu da etkiler.
 - `.env` dosyası sunucuda `backend/api/.env` — DB bilgileri, `PROJECT_ID`/`KEY_FILEPATH` (Firebase), `MAIL_USERNAME`/`MAIL_PASSWORD` (Gmail SMTP), `APP_URL` içeriyor. Repo'da yok (gitignore), sadece sunucuda.
 
 ## Auth
