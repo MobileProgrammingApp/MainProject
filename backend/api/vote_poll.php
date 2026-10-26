@@ -14,7 +14,8 @@ if (!memberBelongsToHouse($conn, $member_id, $house_id)) {
 }
 
 try {
-    $pollCheck = $conn->prepare("SELECT id FROM polls WHERE id = ? AND house_id = ?");
+    // Süresi dolan (24 saat) ankete oy verilemez; bkz. get_active_poll.php
+    $pollCheck = $conn->prepare("SELECT id FROM polls WHERE id = ? AND house_id = ? AND created_at > NOW() - INTERVAL 24 HOUR");
     $pollCheck->execute([$poll_id, $house_id]);
     if (!$pollCheck->fetch(PDO::FETCH_ASSOC)) {
         jsonError("Anket bulunamadı");

@@ -20,7 +20,7 @@ try {
     $tokenStmt->execute([$assigned_to_id]);
 
     // Görev zaten eklendi; bildirim gönderilemese de istemciye başarı dönüyoruz
-    notifyMembers($conn, [$tokenStmt->fetchColumn()], "Yeni Görev!", "Sana bir görev atandı: " . $task_name);
+    notifyMembers($conn, [$tokenStmt->fetchColumn()], "Yeni Görev!", "Sana bir görev atandı: " . $task_name, "chores");
 
     echo json_encode(["status" => "success"]);
 } catch (Exception $e) {

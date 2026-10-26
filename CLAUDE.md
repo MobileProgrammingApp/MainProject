@@ -6,6 +6,8 @@ Flutter mobil uygulaması (ev/ev arkadaşları için görev, market listesi, ev 
 - `flutter_app/` — Flutter uygulaması. Paket adı: `com.swordarchitecture.homepal`.
 - `backend/api/` — PHP backend (PDO/MySQL, prepared statement'lar ile). Bu klasör sunucuda doğrudan web kökü.
 - `backend/schema.sql` — Veri içermeyen, güncel veritabanı şeması (fresh kurulum için).
+- `backend/tests/` — Uçtan uca API testleri: `python backend/tests/run_tests.py` (izole MariaDB + PHP kurar, gerçek veritabanına dokunmaz). Backend değişikliğinden sonra deploy öncesi çalıştırın; yeni endpoint'e test ekleyin.
+- Hesap silme uygulama içinden (`delete_account.php`, şifre onaylı; bağlı tablolar `ON DELETE CASCADE` ile silinir) ve web'den (`delete-account.html`) yapılabilir; Google Play bunu şart koşuyor.
 
 ## Sunucu / Deploy
 - Sunucu: IONOS VPS (Ubuntu), Nginx + PHP-FPM + MariaDB.

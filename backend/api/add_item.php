@@ -21,7 +21,7 @@ try {
     $membersStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE house_id = ? AND id != ?");
     $membersStmt->execute([$user['id'], $member_id ?? 0]);
 
-    notifyMembers($conn, $membersStmt->fetchAll(PDO::FETCH_COLUMN), "Market Listesi", "\"$item_name\" listeye eklendi.");
+    notifyMembers($conn, $membersStmt->fetchAll(PDO::FETCH_COLUMN), "Market Listesi", "\"$item_name\" listeye eklendi.", "shopping");
 
     echo json_encode(["status" => "success"]);
 } catch (Exception $e) {

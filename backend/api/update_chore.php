@@ -29,7 +29,8 @@ try {
         $conn,
         $membersStmt->fetchAll(PDO::FETCH_COLUMN),
         "Görev Tamamlandı",
-        $assigneeName . " \"" . $chore['task_name'] . "\" görevini tamamladı."
+        $assigneeName . " \"" . $chore['task_name'] . "\" görevini tamamladı.",
+        "chores"
     );
 
     echo json_encode(["status" => "success"]);

@@ -28,7 +28,13 @@ try {
     }
 
     if ((int)$row['email_verified'] !== 1) {
-        jsonError("Giriş yapmadan önce e-postanızı doğrulamanız gerekiyor.");
+        // "code": uygulama "doğrulama mailini tekrar gönder" seçeneğini buna göre gösterir
+        echo json_encode([
+            "status" => "error",
+            "code" => "email_not_verified",
+            "message" => "Giriş yapmadan önce e-postanızı doğrulamanız gerekiyor.",
+        ]);
+        exit;
     }
 
     // Her giriş bu cihaz için yeni bir token açar; aynı hesaptaki diğer

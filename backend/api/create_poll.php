@@ -48,7 +48,7 @@ try {
 
     $membersStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE house_id = ?");
     $membersStmt->execute([$house_id]);
-    notifyMembers($conn, $membersStmt->fetchAll(PDO::FETCH_COLUMN), "Yeni Anket", $question);
+    notifyMembers($conn, $membersStmt->fetchAll(PDO::FETCH_COLUMN), "Yeni Anket", $question, "home");
 
     echo json_encode(["status" => "success"]);
 } catch (Exception $e) {

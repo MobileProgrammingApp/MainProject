@@ -77,6 +77,21 @@ function sendPasswordResetEmail(string $toEmail, string $toName, string $token):
     );
 }
 
+function sendAccountDeletedEmail(string $toEmail, string $toName): bool {
+    return sendHomepalMail(
+        $toEmail,
+        $toName,
+        'Homepal hesabınız silindi',
+        "<p>Merhaba " . htmlspecialchars($toName) . ",</p>"
+            . "<p>Homepal ev hesabınız ve hesaba bağlı tüm veriler (ev üyeleri, görevler, market listesi, ev bilgileri ve anketler) uygulama içinden yapılan talep üzerine kalıcı olarak silindi.</p>"
+            . "<p>Bu işlemi siz yapmadıysanız bize bu e-postayı yanıtlayarak ulaşın.</p>"
+            . "<p>İyi günler,<br>Homepal Ekibi</p>",
+        "Merhaba " . $toName . ",\n\n"
+            . "Homepal ev hesabınız ve hesaba bağlı tüm veriler uygulama içinden yapılan talep üzerine kalıcı olarak silindi.\n"
+            . "Bu işlemi siz yapmadıysanız bu e-postayı yanıtlayarak bize ulaşın.\n\nİyi günler,\nHomepal Ekibi"
+    );
+}
+
 /**
  * Kayıtlı bir e-postayla tekrar kayıt olunmaya çalışıldığında gönderilir.
  * Uygulama "bu mail kayıtlı" demediği için (e-posta tahmini engellensin diye)

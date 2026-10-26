@@ -5,7 +5,7 @@
  * Google token'ın artık geçersiz olduğunu söylerse (uygulama silinmiş /
  * yeniden kurulmuş) ve $conn verilmişse token veritabanından temizlenir.
  */
-function sendFCMNotificationV1($projectId, $keyFilePath, $targetToken, $title, $body, ?PDO $conn = null): bool {
+function sendFCMNotificationV1($projectId, $keyFilePath, $targetToken, $title, $body, ?PDO $conn = null, string $screen = ''): bool {
     $accessToken = getGoogleAccessToken($keyFilePath);
 
     $url = "https://fcm.googleapis.com/v1/projects/$projectId/messages:send";
@@ -17,6 +17,8 @@ function sendFCMNotificationV1($projectId, $keyFilePath, $targetToken, $title, $
                 "title" => $title,
                 "body" => $body
             ],
+            // Uygulama bildirime dokunulunca bu ekranı açar (chores / shopping / home)
+            "data" => ["screen" => $screen],
             "android" => [
                 "priority" => "high",
                 "notification" => [
@@ -64,7 +66,7 @@ function sendFCMNotificationV1($projectId, $keyFilePath, $targetToken, $title, $
  * sessizce atlar; tek tek hatalar diğer alıcılara gönderimi engellemesin diye
  * loglanıp geçilir. Aynı cihaz birden fazla üyede kayıtlıysa tek bildirim gider.
  */
-function notifyMembers(PDO $conn, array $tokens, string $title, string $body): void {
+function notifyMembers(PDO $conn, array $tokens, string $title, string $body, string $screen = ''): void {
     $projectId = $_ENV['PROJECT_ID'] ?? null;
     $keyFilePath = $_ENV['KEY_FILEPATH'] ?? null;
     if (!$projectId || !$keyFilePath) {
@@ -73,7 +75,7 @@ function notifyMembers(PDO $conn, array $tokens, string $title, string $body): v
 
     foreach (array_unique(array_filter($tokens)) as $token) {
         try {
-            sendFCMNotificationV1($projectId, $keyFilePath, $token, $title, $body, $conn);
+            sendFCMNotificationV1($projectId, $keyFilePath, $token, $title, $body, $conn, $screen);
         } catch (Throwable $e) {
             // Asıl işlem (görev/ürün/anket) zaten kaydedildi; bildirim hatası onu bozmasın
             error_log("[homepal] FCM: " . $e->getMessage());
