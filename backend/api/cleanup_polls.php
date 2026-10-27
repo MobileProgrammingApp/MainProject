@@ -1,5 +1,6 @@
 <?php
-// Periyodik temizlik. Her istekte değil, cron ile çalıştırılmak üzere tasarlandı
+// Periyodik temizlik ve tekrarlı görevlerin yeniden açılması. Her istekte değil,
+// cron ile SAATTE BİR çalıştırılmak üzere tasarlandı (görevler sabah açılsın diye)
 // (bkz. crontab). Dosya adı crontab'da kayıtlı olduğu için değiştirilmedi.
 // Örnek: 0 * * * * php /var/www/homepal.swordarchitecture.com/backend/api/cleanup_polls.php
 
@@ -9,6 +10,11 @@ if (php_sapi_name() !== 'cli') {
 }
 
 include __DIR__ . '/db.php';
+require_once __DIR__ . '/chores_helper.php';
+
+// Günü gelen tekrarlı görevler (sabah 08:00'den sonraki ilk çalışmada açılır)
+$chores = reopenDueChores($conn);
+echo "Yeniden açılan görev: $chores\n";
 
 // 24 saatten eski anketler
 $deleted = $conn->exec("DELETE FROM polls WHERE created_at < (NOW() - INTERVAL 24 HOUR)");

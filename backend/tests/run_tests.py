@@ -108,6 +108,7 @@ def main():
                    HOMEPAL_TEST_MAILS=os.path.join(app, "mails.log"),
                    HOMEPAL_TEST_PHP_ERRORS=errors_log,
                    HOMEPAL_TEST_PHP=php,
+                   HOMEPAL_TEST_API_DIR=os.path.join(app, "api"),
                    HOMEPAL_TEST_MYSQL=mysql,
                    HOMEPAL_TEST_DB_PORT=str(DB_PORT))
         return subprocess.run([sys.executable, os.path.join(HERE, "test_api.py")], env=env).returncode

@@ -3,12 +3,13 @@
 Doğrudan çalıştırmayın; ortamı run_tests.py kurar (izole MariaDB + PHP sunucusu)
 ve aşağıdaki ortam değişkenlerini verir.
 """
-import json, os, re, subprocess, sys, urllib.parse, urllib.request
+import datetime, json, os, re, subprocess, sys, urllib.parse, urllib.request
 
 BASE = os.environ.get("HOMEPAL_TEST_BASE", "http://127.0.0.1:8099")
 MAILS = os.environ["HOMEPAL_TEST_MAILS"]
 PHP_ERRORS = os.environ["HOMEPAL_TEST_PHP_ERRORS"]
 PHP = os.environ.get("HOMEPAL_TEST_PHP", "php")
+API_DIR = os.environ["HOMEPAL_TEST_API_DIR"]
 MYSQL = [os.environ["HOMEPAL_TEST_MYSQL"], "-h127.0.0.1", "-P" + os.environ.get("HOMEPAL_TEST_DB_PORT", "3307"),
          "-uroot", "homepal_test", "-N", "-e"]
 OLD_TOKEN = "a" * 64  # seed.sql: eski sürümden kalan ortak token
@@ -307,7 +308,73 @@ check("başka evin ürünü düzenlenemiyor", j.get("message") == "Ürün buluna
 c, j = req("edit_item.php", data={"id": item_id, "item_name": "x" * 256}, token=OLD_TOKEN)
 check("256 karakterlik ürün adı reddedildi", "en fazla 255" in j.get("message", ""), j)
 
-print("16) PHP hata logu")
+print("16) Tekrarlayan görevler")
+migration = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "migrations", "2026-10-27_recurring_chores.sql")
+with open(migration, "rb") as f:
+    rc = subprocess.run(MYSQL[:-2], stdin=f, capture_output=True).returncode
+check("migration hazır tabloda tekrar çalıştırılabiliyor", rc == 0, rc)
+# Sunucu günleri Türkiye saatiyle hesaplıyor (UTC+3, yaz saati yok)
+today = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=3))).date()
+yesterday = (today - datetime.timedelta(days=1)).isoformat()
+def chore_row(cid):
+    return sql(f"SELECT CONCAT_WS('|', is_done, assigned_to_id, IFNULL(next_due, '-')) FROM house_chores WHERE id = {cid}")
+def run_cron():
+    return subprocess.run([PHP, "-d", "display_errors=0", os.path.join(API_DIR, "cleanup_polls.php")], capture_output=True, text=True, encoding="utf-8").stdout
+def next_date(every, start, after):
+    helper = os.path.join(API_DIR, "chores_helper.php").replace("\\", "/")
+    code = f"require '{helper}'; echo nextChoreDate('{every}', '{start}', new DateTimeImmutable('{after}', choreTimezone()));"
+    return subprocess.run([PHP, "-r", code], capture_output=True, text=True).stdout
+
+c, j = req("add_chore.php", data={"assigned_to_id": "1", "task_name": "Cop", "repeat": "yearly"}, token=OLD_TOKEN)
+check("geçersiz tekrar seçeneği reddedildi", j.get("message") == "Geçersiz tekrar seçeneği", j)
+c, j = req("add_chore.php", data={"assigned_to_id": "1", "task_name": "Cop", "repeat": "week", "rotate": "1"}, token=OLD_TOKEN)
+rid = sql("SELECT id FROM house_chores WHERE creator_id = 1 ORDER BY id DESC LIMIT 1")
+check("haftalık, sırayla dönen görev eklendi",
+      j.get("status") == "success" and sql(f"SELECT CONCAT_WS('|', repeat_every, repeat_start, rotate) FROM house_chores WHERE id = {rid}") == f"week|{today}|1", j)
+req("add_chore.php", data={"assigned_to_id": "1", "task_name": "Tek seferlik"}, token=OLD_TOKEN)
+oid = sql("SELECT id FROM house_chores WHERE creator_id = 1 ORDER BY id DESC LIMIT 1")
+check("tekrar seçmeyen (eski) istemcinin görevi tek seferlik", sql(f"SELECT CONCAT_WS('|', IFNULL(repeat_every, '-'), rotate) FROM house_chores WHERE id = {oid}") == "-|0")
+
+req("update_chore.php", data={"id": rid}, token=OLD_TOKEN)
+check("tamamlanınca bir hafta sonrasına kuruldu", chore_row(rid) == f"1|1|{today + datetime.timedelta(days=7)}", chore_row(rid))
+req("update_chore.php", data={"id": oid}, token=OLD_TOKEN)
+check("tek seferlik görevin tekrar günü yok", chore_row(oid) == "1|1|-", chore_row(oid))
+req("get_chores.php", token=OLD_TOKEN)
+check("günü gelmeden yeniden açılmıyor", chore_row(rid).startswith("1|"), chore_row(rid))
+
+sql(f"UPDATE house_chores SET next_due = '{yesterday}' WHERE id = {rid}")
+c, j = req("get_chores.php", token=OLD_TOKEN)
+check("günü gelince liste çekilirken açıldı ve sıradakine (Ayse) geçti", chore_row(rid) == "0|2|-", chore_row(rid))
+check("listede tekrar bilgisi dönüyor", any(str(x.get("id")) == rid and x.get("repeat_every") == "week" for x in j), j)
+req("update_chore.php", data={"id": rid}, token=OLD_TOKEN)
+sql(f"UPDATE house_chores SET next_due = '{yesterday}' WHERE id = {rid}")
+out = run_cron()
+check("cron açtı, sıra başa (Ahmet) döndü", chore_row(rid) == "0|1|-" and "Yeniden açılan görev: 1" in out, (chore_row(rid), out))
+check("tek seferlik görev cron'da açılmadı", chore_row(oid).startswith("1|"), chore_row(oid))
+
+c, j = req("edit_chore.php", data={"id": rid, "task_name": "Copu cikar", "assigned_to_id": "1"}, token=OLD_TOKEN)
+check("tekrar göndermeyen (1.2.0) düzenleme ayarı bozmuyor",
+      sql(f"SELECT CONCAT_WS('|', task_name, repeat_every, repeat_start, rotate) FROM house_chores WHERE id = {rid}") == f"Copu cikar|week|{today}|1")
+req("edit_chore.php", data={"id": oid, "task_name": "Tek seferlik", "assigned_to_id": "1", "repeat": "day"}, token=OLD_TOKEN)
+check("tamamlanmış görev günlüğe çevrilince yarın açılacak",
+      sql(f"SELECT CONCAT_WS('|', repeat_every, rotate, next_due) FROM house_chores WHERE id = {oid}") == f"day|0|{today + datetime.timedelta(days=1)}")
+req("edit_chore.php", data={"id": oid, "task_name": "Tek seferlik", "assigned_to_id": "1", "repeat": "none", "rotate": "1"}, token=OLD_TOKEN)
+check("tekrar kapatılınca görev tek seferliğe döndü",
+      sql(f"SELECT CONCAT_WS('|', IFNULL(repeat_every, '-'), IFNULL(repeat_start, '-'), rotate, IFNULL(next_due, '-')) FROM house_chores WHERE id = {oid}") == "-|-|0|-")
+
+req("add_member.php", data={"name": "Cem"}, token=OLD_TOKEN)
+cem = sql("SELECT id FROM home_members WHERE house_id = 1 ORDER BY id DESC LIMIT 1")
+req("edit_chore.php", data={"id": rid, "task_name": "Copu cikar", "assigned_to_id": cem, "repeat": "week", "rotate": "1"}, token=OLD_TOKEN)
+req("delete_member.php", data={"id": cem}, token=OLD_TOKEN)
+check("sırası gelen kişi silinince görev sıradakine geçti", chore_row(rid) == "0|1|-", chore_row(rid))
+
+check("aylık: ayın 31'i şubatta son güne düşer", next_date("month", "2026-01-31", "2026-01-31") == "2026-02-28")
+check("aylık: sonra yine 31'ine döner", next_date("month", "2026-01-31", "2026-02-28") == "2026-03-31")
+check("haftalık: geç tamamlansa da aynı gün açılır", next_date("week", "2026-10-05", "2026-10-20") == "2026-10-26")
+check("günlük: yarın açılır", next_date("day", "2026-10-27", "2026-10-27") == "2026-10-28")
+sql(f"DELETE FROM house_chores WHERE id IN ({rid}, {oid})")
+
+print("17) PHP hata logu")
 errs = open(PHP_ERRORS, encoding="utf-8", errors="replace").read() if os.path.exists(PHP_ERRORS) else ""
 bad = [l for l in errs.splitlines() if re.search(r"PHP (Warning|Fatal|Notice|Deprecated)", l)]
 check("PHP uyarı/hata logu temiz", not bad, "\n" + "\n".join(bad[:8]))

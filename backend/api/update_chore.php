@@ -1,13 +1,13 @@
 <?php
 include 'db.php';
-require_once __DIR__ . '/fcm_helper.php';
+require_once __DIR__ . '/chores_helper.php';
 require_once __DIR__ . '/auth.php';
 
 $user = authenticateRequest($conn);
 $id = requireInt($_POST, 'id');
 
 try {
-    $choreStmt = $conn->prepare("SELECT assigned_to_id, task_name FROM house_chores WHERE id = ? AND creator_id = ?");
+    $choreStmt = $conn->prepare("SELECT assigned_to_id, task_name, repeat_every, repeat_start FROM house_chores WHERE id = ? AND creator_id = ?");
     $choreStmt->execute([$id, $user['id']]);
     $chore = $choreStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -15,8 +15,9 @@ try {
         jsonError("Görev bulunamadı");
     }
 
-    $stmt = $conn->prepare("UPDATE house_chores SET is_done = 1 WHERE id = ?");
-    $stmt->execute([$id]);
+    // Tekrarlı görev, sıradaki günü gelince kendiliğinden yeniden açılır (chores_helper.php)
+    $stmt = $conn->prepare("UPDATE house_chores SET is_done = 1, next_due = ? WHERE id = ?");
+    $stmt->execute([choreNextDue($chore['repeat_every'], $chore['repeat_start']), $id]);
 
     $assigneeStmt = $conn->prepare("SELECT name FROM home_members WHERE id = ?");
     $assigneeStmt->execute([$chore['assigned_to_id']]);

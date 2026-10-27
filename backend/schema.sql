@@ -18,7 +18,11 @@ CREATE TABLE `house_chores` (
   `assigned_to_id` int NOT NULL,
   `task_name` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
   `is_done` tinyint(1) DEFAULT '0',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `repeat_every` enum('day','week','month') COLLATE utf8mb4_general_ci DEFAULT NULL,
+  `repeat_start` date DEFAULT NULL,
+  `rotate` tinyint(1) NOT NULL DEFAULT '0',
+  `next_due` date DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `house_infos` (

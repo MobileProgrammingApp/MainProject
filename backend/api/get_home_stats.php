@@ -1,10 +1,13 @@
 <?php
 include 'db.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/chores_helper.php';
 
 $user = authenticateRequest($conn);
 
 try {
+    reopenDueChores($conn, (int) $user['id']);
+
     $stmtChores = $conn->prepare("SELECT COUNT(*) FROM house_chores WHERE creator_id = ? AND is_done = 0");
     $stmtChores->execute([$user['id']]);
 
