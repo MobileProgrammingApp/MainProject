@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api_service.dart';
 import '../../core/app_scaffold.dart';
 import '../../core/app_theme.dart';
+import '../../core/crash_reporting.dart';
 import '../../core/notification_service.dart';
 import '../../core/session.dart';
 import '../../core/widgets/homepal_mark.dart';
@@ -99,6 +100,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   Future<Widget> _prepareSteps() async {
     try {
       await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      await CrashReporting.initialize();
       await NotificationService.initialize();
     } catch (e) {
       // Bildirimler çalışmasa da uygulama açılsın (ör. Google Play servisleri yok)
