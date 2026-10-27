@@ -267,18 +267,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
               label: const Text("Önce eve bir kişi ekle"),
             )
           else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: houseMembers.map<Widget>((member) {
-                final id = member['id'].toString();
-                return ChoiceChip(
-                  avatar: selectedMemberId == id ? null : const Icon(Icons.person_outline_rounded, size: 18),
-                  label: Text(member['name'].toString()),
-                  selected: selectedMemberId == id,
-                  onSelected: (_) => _onMemberChanged(id),
-                );
-              }).toList(),
+            // Açılır menü: kişi sayısı artsa da tek satırda kalır ve yanlışlıkla
+            // dokunup bu cihazın kişisini değiştirmek zorlaşır
+            DropdownButtonFormField<String>(
+              // Kayıtlı seçim kişiler yüklendikten sonra geldiğinde menü de güncellensin
+              key: ValueKey(selectedMemberId),
+              initialValue: selectedMemberId,
+              isExpanded: true,
+              borderRadius: BorderRadius.circular(AppStyles.radius),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.person_outline_rounded)),
+              hint: const Text("Kendini seç"),
+              items: houseMembers
+                  .map<DropdownMenuItem<String>>((member) => DropdownMenuItem(
+                        value: member['id'].toString(),
+                        child: Text(member['name'].toString(), overflow: TextOverflow.ellipsis),
+                      ))
+                  .toList(),
+              onChanged: _onMemberChanged,
             ),
         ],
       ),

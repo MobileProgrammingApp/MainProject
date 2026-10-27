@@ -449,33 +449,34 @@ class _ChoreSheetState extends State<_ChoreSheet> {
               label: const Text("Önce eve bir kişi ekle"),
             )
           else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: widget.members.map<Widget>((m) {
-                final id = m['id'].toString();
-                return ChoiceChip(
-                  label: Text(m['name'].toString()),
-                  selected: _assignedId == id,
-                  onSelected: (_) => setState(() => _assignedId = id),
-                );
-              }).toList(),
+            DropdownButtonFormField<String>(
+              initialValue: _assignedId,
+              isExpanded: true,
+              borderRadius: BorderRadius.circular(AppStyles.radius),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.person_outline_rounded)),
+              hint: const Text("Kişi seç"),
+              items: widget.members
+                  .map<DropdownMenuItem<String>>((m) => DropdownMenuItem(
+                        value: m['id'].toString(),
+                        child: Text(m['name'].toString(), overflow: TextOverflow.ellipsis),
+                      ))
+                  .toList(),
+              onChanged: (id) => setState(() => _assignedId = id),
             ),
           const SizedBox(height: 18),
           const Text("Ne sıklıkla?", style: AppStyles.listTileSubtitle),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              ChoiceChip(label: const Text("Tek sefer"), selected: _repeat == null, onSelected: (_) => setState(() => _repeat = null)),
-              for (final entry in _repeatNames.entries)
-                ChoiceChip(
-                  label: Text(entry.value),
-                  selected: _repeat == entry.key,
-                  onSelected: (_) => setState(() => _repeat = entry.key),
-                ),
+          DropdownButtonFormField<String>(
+            // Menü null değeri "seçim yok" sayar; tek seferlik görev "none" ile gösterilir
+            initialValue: _repeat ?? "none",
+            isExpanded: true,
+            borderRadius: BorderRadius.circular(AppStyles.radius),
+            decoration: const InputDecoration(prefixIcon: Icon(Icons.repeat_rounded)),
+            items: [
+              const DropdownMenuItem(value: "none", child: Text("Tek sefer")),
+              for (final entry in _repeatNames.entries) DropdownMenuItem(value: entry.key, child: Text(entry.value)),
             ],
+            onChanged: (value) => setState(() => _repeat = value == "none" ? null : value),
           ),
           if (_repeat != null && widget.members.length > 1)
             SwitchListTile(
