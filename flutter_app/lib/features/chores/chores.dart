@@ -58,14 +58,17 @@ class _ChoresScreenState extends State<ChoresScreen> {
                 name: c['task_name'].toString(),
                 assignedId: c['assigned_to_id'].toString(),
                 done: c['is_done'] == 1 || c['is_done'] == "1" || c['is_done'] == true,
+                repeat: c['repeat_every']?.toString(),
+                rotate: c['rotate']?.toString() == "1",
+                nextDue: DateTime.tryParse(c['next_due']?.toString() ?? ""),
               ))
           .toList();
       _isLoading = false;
     });
   }
 
-  Future<void> _addChore(String name, String assignedId) async {
-    final success = await ApiService.addChore(_houseId!, int.parse(assignedId), name);
+  Future<void> _addChore(String name, String assignedId, String? repeat, bool rotate) async {
+    final success = await ApiService.addChore(_houseId!, int.parse(assignedId), name, repeat: repeat, rotate: rotate);
     if (!mounted) return;
     if (success) {
       await _fetchChores();
@@ -75,9 +78,9 @@ class _ChoresScreenState extends State<ChoresScreen> {
     }
   }
 
-  Future<void> _edit(_Chore chore, String name, String assignedId) async {
-    if (name == chore.name && assignedId == chore.assignedId) return;
-    final success = await ApiService.editChore(chore.id, name, int.parse(assignedId));
+  Future<void> _edit(_Chore chore, String name, String assignedId, String? repeat, bool rotate) async {
+    if (name == chore.name && assignedId == chore.assignedId && repeat == chore.repeat && rotate == chore.rotate) return;
+    final success = await ApiService.editChore(chore.id, name, int.parse(assignedId), repeat: repeat, rotate: rotate);
     if (!mounted) return;
     if (success) {
       await _fetchChores();
@@ -119,9 +122,10 @@ class _ChoresScreenState extends State<ChoresScreen> {
     );
   }
 
+  // Tekrarlı görevler silinmez: günü gelince yeniden açılmak için bekliyorlar
   Future<void> _clearDone() async {
-    final done = _chores.where((c) => c.done).toList();
-    setState(() => _chores.removeWhere((c) => c.done));
+    final done = _chores.where((c) => c.done && c.repeat == null).toList();
+    setState(() => _chores.removeWhere(done.contains));
 
     final results = await Future.wait(done.map((c) => ApiService.deleteChore(c.id)));
     if (results.contains(false) && mounted) {
@@ -190,12 +194,14 @@ class _ChoresScreenState extends State<ChoresScreen> {
                           SectionHeader(
                             title: "Tamamlananlar",
                             count: done.length,
-                            action: TextButton.icon(
-                              onPressed: _clearDone,
-                              icon: const Icon(Icons.delete_sweep_outlined, size: 18),
-                              label: const Text("Temizle"),
-                              style: TextButton.styleFrom(foregroundColor: AppStyles.mutedTextColor),
-                            ),
+                            action: done.every((c) => c.repeat != null)
+                                ? null
+                                : TextButton.icon(
+                                    onPressed: _clearDone,
+                                    icon: const Icon(Icons.delete_sweep_outlined, size: 18),
+                                    label: const Text("Temizle"),
+                                    style: TextButton.styleFrom(foregroundColor: AppStyles.mutedTextColor),
+                                  ),
                           ),
                           GroupedCard(dividerIndent: 72, children: done.map(_buildDoneRow).toList()),
                         ],
@@ -248,7 +254,7 @@ class _ChoresScreenState extends State<ChoresScreen> {
           child: Text(name.characters.first.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
         title: Text(chore.name, style: AppStyles.listTileTitle),
-        subtitle: Text(name),
+        subtitle: Text([name, if (chore.repeat != null) _repeatLabel(chore)].join(" · ")),
         trailing: IconButton(
           tooltip: "Tamamlandı",
           icon: const Icon(Icons.check_circle_outline_rounded, color: AppStyles.successColor, size: 28),
@@ -259,9 +265,12 @@ class _ChoresScreenState extends State<ChoresScreen> {
   }
 
   Widget _buildDoneRow(_Chore chore) {
+    final due = chore.nextDue;
     return _swipeToDelete(
       chore,
       ListTile(
+        // Tekrarlı görev beklerken de düzenlenebilsin (ör. tekrarı kapatmak için)
+        onTap: chore.repeat == null ? null : () => _showChoreSheet(chore),
         contentPadding: const EdgeInsets.fromLTRB(16, 2, 8, 2),
         leading: const CircleAvatar(
           backgroundColor: AppStyles.successSoft,
@@ -275,7 +284,10 @@ class _ChoresScreenState extends State<ChoresScreen> {
             color: AppStyles.mutedTextColor,
           ),
         ),
-        subtitle: Text("Yapan: ${_memberName(chore.assignedId)}"),
+        subtitle: Text([
+          "Yapan: ${_memberName(chore.assignedId)}",
+          if (chore.repeat != null && due != null) "Tekrar: ${_dueLabel(due)}",
+        ].join(" · ")),
         trailing: IconButton(
           tooltip: "Sil",
           icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
@@ -296,10 +308,30 @@ class _ChoresScreenState extends State<ChoresScreen> {
       builder: (_) => _ChoreSheet(
         members: _houseMembers,
         initial: chore,
-        onSave: chore == null ? _addChore : (name, assignedId) => _edit(chore, name, assignedId),
+        onSave: chore == null
+            ? _addChore
+            : (name, assignedId, repeat, rotate) => _edit(chore, name, assignedId, repeat, rotate),
       ),
     );
   }
+}
+
+const _repeatNames = {"day": "Her gün", "week": "Her hafta", "month": "Her ay"};
+const _weekdays = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"];
+const _months = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+
+String _repeatLabel(_Chore chore) => "${_repeatNames[chore.repeat] ?? ""}${chore.rotate ? ", sırayla" : ""}";
+
+/// Tekrarlı görevin yeniden açılacağı gün: "Bugün", "Yarın", bu hafta içindeyse
+/// gün adı, daha ilerideyse "12 Kasım".
+String _dueLabel(DateTime due) {
+  final now = DateTime.now();
+  // UTC'de karşılaştır: yaz saati geçişinde gün farkı şaşmasın
+  final days = DateTime.utc(due.year, due.month, due.day).difference(DateTime.utc(now.year, now.month, now.day)).inDays;
+  if (days <= 0) return "Bugün";
+  if (days == 1) return "Yarın";
+  if (days < 7) return _weekdays[due.weekday - 1];
+  return "${due.day} ${_months[due.month - 1]}";
 }
 
 class _Chore {
@@ -307,13 +339,31 @@ class _Chore {
   final String name;
   final String assignedId;
   final bool done;
-  const _Chore({required this.id, required this.name, required this.assignedId, required this.done});
+
+  /// "day" | "week" | "month"; tek seferlik görevde null
+  final String? repeat;
+
+  /// Her tekrarda görev evdeki sıradaki kişiye geçer
+  final bool rotate;
+
+  /// Tamamlanmış tekrarlı görevin yeniden açılacağı gün
+  final DateTime? nextDue;
+
+  const _Chore({
+    required this.id,
+    required this.name,
+    required this.assignedId,
+    required this.done,
+    this.repeat,
+    this.rotate = false,
+    this.nextDue,
+  });
 }
 
 class _ChoreSheet extends StatefulWidget {
   final List<dynamic> members;
   final _Chore? initial;
-  final Future<void> Function(String name, String assignedId) onSave;
+  final Future<void> Function(String name, String assignedId, String? repeat, bool rotate) onSave;
 
   const _ChoreSheet({required this.members, required this.onSave, this.initial});
 
@@ -324,6 +374,8 @@ class _ChoreSheet extends StatefulWidget {
 class _ChoreSheetState extends State<_ChoreSheet> {
   late final _nameController = TextEditingController(text: widget.initial?.name);
   String? _assignedId;
+  late String? _repeat = widget.initial?.repeat;
+  late bool _rotate = widget.initial?.rotate ?? false;
 
   @override
   void initState() {
@@ -348,13 +400,22 @@ class _ChoreSheetState extends State<_ChoreSheet> {
       return;
     }
     Navigator.pop(context);
-    widget.onSave(name, _assignedId!);
+    widget.onSave(name, _assignedId!, _repeat, _repeat != null && _rotate);
+  }
+
+  /// Sırayla dönen görevin kimlerden geçeceği, seçilen kişiden başlayarak
+  /// (sunucu da üyeleri bu sırayla dolaşır)
+  String _rotationOrder() {
+    final names = widget.members.map((m) => m['name'].toString()).toList();
+    final start = widget.members.indexWhere((m) => m['id'].toString() == _assignedId);
+    return [...names.skip(start.clamp(0, names.length)), ...names.take(start.clamp(0, names.length))].join(" → ");
   }
 
   @override
   Widget build(BuildContext context) {
     final editing = widget.initial != null;
-    return Padding(
+    // Klavye açıkken uzun üye listesi ve tekrar seçenekleri ekrana sığmayabilir
+    return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.viewInsetsOf(context).bottom + 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -399,6 +460,30 @@ class _ChoreSheetState extends State<_ChoreSheet> {
                   onSelected: (_) => setState(() => _assignedId = id),
                 );
               }).toList(),
+            ),
+          const SizedBox(height: 18),
+          const Text("Ne sıklıkla?", style: AppStyles.listTileSubtitle),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              ChoiceChip(label: const Text("Tek sefer"), selected: _repeat == null, onSelected: (_) => setState(() => _repeat = null)),
+              for (final entry in _repeatNames.entries)
+                ChoiceChip(
+                  label: Text(entry.value),
+                  selected: _repeat == entry.key,
+                  onSelected: (_) => setState(() => _repeat = entry.key),
+                ),
+            ],
+          ),
+          if (_repeat != null && widget.members.length > 1)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _rotate,
+              onChanged: (value) => setState(() => _rotate = value),
+              title: const Text("Sırayla herkese"),
+              subtitle: Text(_rotationOrder()),
             ),
           const SizedBox(height: 24),
           FilledButton(onPressed: _submit, child: Text(editing ? "Kaydet" : "Görevi ekle")),

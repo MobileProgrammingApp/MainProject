@@ -215,19 +215,26 @@ class ApiService {
 
   static Future<List<dynamic>> getChores(int houseId) => _getList("get_chores.php");
 
-  static Future<bool> addChore(int creatorId, int assignedToId, String taskName) =>
+  /// [repeat]: "day" | "week" | "month", tek seferlik görev için null. Tekrarlı
+  /// görev tamamlanınca sıradaki günü sabah yeniden açılır; [rotate] ise o
+  /// sırada görev evdeki bir sonraki kişiye geçer.
+  static Future<bool> addChore(int creatorId, int assignedToId, String taskName, {String? repeat, bool rotate = false}) =>
       _postForSuccess("add_chore.php", {
         "assigned_to_id": assignedToId.toString(),
         "task_name": taskName,
+        "repeat": repeat ?? "none",
+        "rotate": rotate ? "1" : "0",
       });
 
-  /// Görevin adını ve/veya sorumlusunu değiştirir; sorumlu değiştiyse sunucu
-  /// yeni kişiye bildirim gönderir.
-  static Future<bool> editChore(int id, String taskName, int assignedToId) =>
+  /// Görevin adını, sorumlusunu ve tekrarını değiştirir; sorumlu değiştiyse
+  /// sunucu yeni kişiye bildirim gönderir.
+  static Future<bool> editChore(int id, String taskName, int assignedToId, {String? repeat, bool rotate = false}) =>
       _postForSuccess("edit_chore.php", {
         "id": id.toString(),
         "task_name": taskName,
         "assigned_to_id": assignedToId.toString(),
+        "repeat": repeat ?? "none",
+        "rotate": rotate ? "1" : "0",
       });
 
   static Future<bool> completeChore(int id) => _postForSuccess("update_chore.php", {"id": id.toString()});
