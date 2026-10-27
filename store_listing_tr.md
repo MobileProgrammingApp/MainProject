@@ -38,4 +38,4 @@ Homepal, karmaşık ev yönetimi uygulamalarının aksine sade ve hızlı kullan
 - Gizlilik politikası URL: https://homepal.swordarchitecture.com/privacy.html
 - Kategori önerisi: Araçlar (Tools) veya Yaşam Tarzı (Lifestyle)
 - İçerik derecelendirmesi: Herkes / 3+ (şiddet, uygunsuz içerik yok)
-- Veri güvenliği formunda beyan edilecekler: E-posta adresi, kişisel bilgiler (ev/üye isimleri), kullanıcı içeriği (görev/market/anket verisi), cihaz kimliği (FCM push token). Hiçbiri üçüncü taraflarla reklam amaçlı paylaşılmıyor.
+- Veri güvenliği formunda beyan edilecekler: E-posta adresi, kişisel bilgiler (ev/üye isimleri), kullanıcı içeriği (görev/market/anket verisi), cihaz kimliği (FCM push token, Crashlytics kurulum kimliği), uygulama bilgileri ve performans (kilitlenme günlükleri ve teşhis, 1.2.1+). Hiçbiri üçüncü taraflarla reklam amaçlı paylaşılmıyor.

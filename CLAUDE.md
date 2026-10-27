@@ -37,6 +37,12 @@ Flutter mobil uygulaması (ev/ev arkadaşları için görev, market listesi, ev 
 - `backend/api/fcm_helper.php` — FCM v1 API ile bildirim gönderme (görev atama/tamamlama, yeni anket, market listesine ürün ekleme). Endpoint'ler `notifyMembers()` kullanır; Google `NOT_FOUND`/`UNREGISTERED` derse token DB'den silinir, hatalar `error_log`'a yazılır. Bir cihaz token'ı aynı anda tek üyede tutulur (`update_member_token.php`).
 - Firebase servis hesabı JSON anahtarı sunucuda **web kökünün dışında**: `/etc/homepal/fcm-service-account.json` (`root:www-data`, `640`), `.env`'de `KEY_FILEPATH`. Eskiden `backend/api/keys/` altındaydı ve web'den indirilebiliyordu; 2026-10-23'te o anahtar iptal edilip yenisi oluşturuldu.
 
+## Çökme raporları (Crashlytics)
+- 1.2.1'den itibaren Firebase Crashlytics açık (`flutter_app/lib/core/crash_reporting.dart`, açılışta `SplashScreen` Firebase'den hemen sonra başlatır). Yakalanmamış Flutter/Dart hataları ve yerel çökmeler aynı Firebase projesinin Crashlytics panosuna düşer.
+- Rapor yalnızca release derlemeden gider (`kReleaseMode`); debug/profile derlemeler göndermez. Kodun içinde yakalanan ağ hataları (ApiService) rapor edilmez.
+- Gradle: `com.google.firebase.crashlytics` eklentisi google-services 4.4.1+ ister. Release derlemede R8 mapping dosyası otomatik yüklenir, yani `flutter build appbundle` sırasında internet gerekir.
+- Raporlara kullanıcı kimliği/e-posta eklenmiyor; bu yüzden gizlilik politikası ve Play veri güvenliği formunda sadece "çökme günlükleri, tanılama, cihaz kimliği" beyan ediliyor. Kimlik eklenecekse ikisi de güncellenmeli.
+
 ## Play Store
 - Paket adı: `com.swordarchitecture.homepal` (değiştirilemez, kalıcı).
 - **KRİTİK — asla kaybetmeyin**: Release imzalama anahtarı `flutter_app/android/homepal-release-key.jks` ve `flutter_app/android/key.properties` — **gitignore'da, repo'da yoklar**. Bu dosyaları kaybederseniz Play Store'daki uygulamayı bir daha güncelleyemezsiniz (yeni bir uygulama gibi yayınlamanız gerekir). Bilgisayar formatlanmadan/değişmeden önce bu iki dosyayı ayrıca yedekleyin (USB, bulut depolama vb.).

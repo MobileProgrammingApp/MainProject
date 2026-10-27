@@ -13,7 +13,7 @@
 </head>
 <body>
   <h1>Homepal Gizlilik Politikası</h1>
-  <p><em>Son güncelleme: 2026</em></p>
+  <p><em>Son güncelleme: Ekim 2026</em></p>
 
   <p>Homepal, ev arkadaşlarının/aile üyelerinin görev, market listesi, ev bilgileri ve anketleri paylaşarak yönetmesini sağlayan bir mobil uygulamadır. Bu sayfa, uygulamayı kullanırken hangi verilerin toplandığını ve nasıl kullanıldığını açıklar.</p>
 
@@ -23,16 +23,17 @@
     <li><strong>Ev adı ve üye isimleri:</strong> Uygulama içinde girdiğiniz, ev/aile üyelerini tanımlamak için kullanılan isimler.</li>
     <li><strong>Görev, market listesi, ev bilgisi/envanter ve anket verileri:</strong> Uygulamayı kullanırken oluşturduğunuz içerik.</li>
     <li><strong>Push bildirim token'ı (FCM):</strong> Görev atama, görev tamamlama ve anket bildirimlerini cihazınıza gönderebilmek için Google Firebase Cloud Messaging servisine kayıtlı bir cihaz tanımlayıcısı.</li>
+    <li><strong>Çökme raporları (Firebase Crashlytics):</strong> Uygulama çöktüğünde veya beklenmeyen bir hata oluştuğunda; hatanın teknik ayrıntıları, uygulama sürümü, cihaz modeli ve Android sürümü gibi bilgiler ile rastgele oluşturulmuş bir kurulum tanımlayıcısı. Bu raporlar e-posta adresinizi, isimleri veya uygulamaya girdiğiniz içerikleri (görevler, market listesi vb.) içermez.</li>
   </ul>
 
   <h2>Verilerin Kullanım Amacı</h2>
-  <p>Toplanan veriler yalnızca uygulamanın temel işlevlerini sağlamak (hesap girişi, ev içi görev/market/anket paylaşımı, bildirim gönderimi) için kullanılır. Veriler reklam amacıyla kullanılmaz, üçüncü taraflara satılmaz veya pazarlama amacıyla paylaşılmaz.</p>
+  <p>Toplanan veriler yalnızca uygulamanın temel işlevlerini sağlamak (hesap girişi, ev içi görev/market/anket paylaşımı, bildirim gönderimi) ve uygulamadaki hataları bulup düzeltmek için kullanılır. Veriler reklam amacıyla kullanılmaz, üçüncü taraflara satılmaz veya pazarlama amacıyla paylaşılmaz.</p>
 
   <h2>Verilerin Saklandığı Yer</h2>
-  <p>Tüm kullanıcı verileri, geliştiricinin kendi yönettiği bir sunucuda (VPS) barındırılan bir veritabanında saklanır. Push bildirimler için Google Firebase Cloud Messaging altyapısı kullanılır; bu kapsamda cihaz bildirim token'ı Google ile paylaşılır (bkz. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Gizlilik Politikası</a>).</p>
+  <p>Tüm kullanıcı verileri, geliştiricinin kendi yönettiği bir sunucuda (VPS) barındırılan bir veritabanında saklanır. Push bildirimler için Google Firebase Cloud Messaging altyapısı kullanılır; bu kapsamda cihaz bildirim token'ı Google ile paylaşılır. Çökme raporları Google Firebase Crashlytics servisinde 90 gün saklanır (bkz. <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Gizlilik Politikası</a>, <a href="https://firebase.google.com/support/privacy" target="_blank" rel="noopener">Firebase gizlilik bilgileri</a>).</p>
 
   <h2>Veri Saklama ve Silme</h2>
-  <p>Verileriniz, hesabınız aktif olduğu sürece saklanır. Hesabınızın ve ilişkili tüm verilerin (görevler, üyeler, market listesi, ev bilgileri, anketler dahil) silinmesini talep etmek için aşağıdaki e-posta adresinden bizimle iletişime geçebilirsiniz.</p>
+  <p>Verileriniz, hesabınız aktif olduğu sürece saklanır. Hesabınızı ve ilişkili tüm verileri (görevler, üyeler, market listesi, ev bilgileri, anketler dahil) uygulamada <strong>Ayarlar → Profil → Hesabı sil</strong> adımlarıyla kalıcı olarak silebilirsiniz. Uygulamaya erişemiyorsanız aşağıdaki e-posta adresinden de silme talebinde bulunabilirsiniz.</p>
 
   <h2>İletişim</h2>
   <p>Gizlilik ile ilgili sorularınız veya veri silme talepleriniz için: <a href="mailto:homepal.noreply@gmail.com">homepal.noreply@gmail.com</a></p>
