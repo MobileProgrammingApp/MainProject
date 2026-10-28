@@ -45,15 +45,15 @@ CREATE TABLE `polls` (
   `id` int NOT NULL,
   `house_id` int NOT NULL,
   `question` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
-  `is_active` tinyint(1) DEFAULT '1',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `ends_at` datetime DEFAULT NULL,
+  `created_by` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `poll_options` (
   `id` int NOT NULL,
   `poll_id` int NOT NULL,
-  `option_text` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
-  `vote_count` int DEFAULT '0'
+  `option_text` varchar(100) COLLATE utf8mb4_general_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `poll_votes` (

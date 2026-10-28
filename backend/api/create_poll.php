@@ -2,13 +2,15 @@
 include 'db.php';
 require_once __DIR__ . '/fcm_helper.php';
 require_once __DIR__ . '/auth.php';
+require_once __DIR__ . '/polls_helper.php';
 
 const MAX_POLL_OPTIONS = 10;
 
 $user = authenticateRequest($conn);
 $house_id = $user['id'];
 
-// JSON olarak gelen veriyi al: {"question": "...", "options": ["Pizza", "Burger"]}
+// JSON olarak gelen veri: {"question": "...", "options": ["Pizza", "Burger"],
+// "duration_hours": 24, "member_id": 3}. Son ikisi isteğe bağlı (1.2.0 ve öncesi göndermez).
 $data = json_decode(file_get_contents('php://input'), true);
 if (!is_array($data)) {
     jsonError("Eksik veri gönderildi");
@@ -27,27 +29,60 @@ $options = array_map(function ($i) use ($options) {
     return requireText($options, $i, 100, 'Seçenek');
 }, array_keys($options));
 
+$hours = POLL_DEFAULT_HOURS;
+if (isset($data['duration_hours'])) {
+    $hours = filter_var($data['duration_hours'], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1, "max_range" => POLL_MAX_HOURS]]);
+    if ($hours === false) {
+        jsonError("Geçersiz anket süresi");
+    }
+}
+
+// Anketi açan üye: "kim sordu" gösterilir ve kendisine bildirim gitmez
+$creator_id = null;
+if (!empty($data['member_id'])) {
+    $creator_id = requireInt($data, 'member_id');
+    if (!memberBelongsToHouse($conn, $creator_id, $house_id)) {
+        jsonError("Geçersiz üye");
+    }
+}
+
 try {
+    // Yeni anket açık olanın yerine geçtiği için, açık anketi de sadece açan kişi
+    // değiştirebilir (bkz. end_poll.php). Biten anketin yerine herkes yenisini açabilir.
+    $openStmt = $conn->prepare(
+        "SELECT m.id AS creator
+         FROM polls p
+         LEFT JOIN home_members m ON m.id = p.created_by
+         WHERE p.house_id = ? AND p.ends_at > NOW() AND m.id IS NOT NULL AND m.id != ?
+         LIMIT 1"
+    );
+    $openStmt->execute([$house_id, $creator_id ?? 0]);
+    if ($openStmt->fetch(PDO::FETCH_ASSOC)) {
+        jsonError("Açık anketi sadece açan kişi değiştirebilir");
+    }
+
     $conn->beginTransaction();
 
-    // 1. Varsa eski anketleri sil (Evde tek aktif anket olsun diye)
+    // 1. Varsa eski anketleri sil (Evde tek anket olsun diye)
     $conn->prepare("DELETE FROM polls WHERE house_id = ?")->execute([$house_id]);
 
     // 2. Yeni Anketi Oluştur
-    $stmt = $conn->prepare("INSERT INTO polls (house_id, question, is_active) VALUES (?, ?, 1)");
-    $stmt->execute([$house_id, $question]);
+    $stmt = $conn->prepare(
+        "INSERT INTO polls (house_id, question, ends_at, created_by) VALUES (?, ?, NOW() + INTERVAL ? HOUR, ?)"
+    );
+    $stmt->execute([$house_id, $question, $hours, $creator_id]);
     $poll_id = $conn->lastInsertId();
 
     // 3. Seçenekleri Ekle
-    $stmtOpt = $conn->prepare("INSERT INTO poll_options (poll_id, option_text, vote_count) VALUES (?, ?, 0)");
+    $stmtOpt = $conn->prepare("INSERT INTO poll_options (poll_id, option_text) VALUES (?, ?)");
     foreach ($options as $opt) {
         $stmtOpt->execute([$poll_id, $opt]);
     }
 
     $conn->commit();
 
-    $membersStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE house_id = ?");
-    $membersStmt->execute([$house_id]);
+    $membersStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE house_id = ? AND id != ?");
+    $membersStmt->execute([$house_id, $creator_id ?? 0]);
     notifyMembers($conn, $membersStmt->fetchAll(PDO::FETCH_COLUMN), "Yeni Anket", $question, "home");
 
     echo json_encode(["status" => "success"]);

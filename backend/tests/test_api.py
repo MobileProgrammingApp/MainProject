@@ -204,8 +204,9 @@ poll_id, opt_id = j.get("poll_id"), j["options"][0]["id"]
 c, j = req("vote_poll.php", data={"api_token": OLD_TOKEN, "poll_id": poll_id, "option_id": opt_id, "member_id": "1"})
 check("oy verildi", j.get("status") == "success", j)
 c, j = req("vote_poll.php", data={"api_token": OLD_TOKEN, "poll_id": poll_id, "option_id": opt_id, "member_id": "1"})
-check("ikinci oy reddedildi", j.get("message") == "Zaten oy kullandınız", j)
-check("sayaç 1'de kaldı", sql(f"SELECT vote_count FROM poll_options WHERE id = {opt_id}") == "1")
+check("aynı seçeneğe ikinci oy hata vermiyor", j.get("status") == "success", j)
+c, j = req("get_active_poll.php", get={"api_token": OLD_TOKEN, "member_id": "1"})
+check("ikinci oy sayılmadı (sayaç 1'de kaldı)", int(j["options"][0]["vote_count"]) == 1, j)
 
 print("9) Bildirim token'ı")
 c, j = req("update_member_token.php", data={"member_id": "1", "fcm_token": "tokA"}, token=OLD_TOKEN)
@@ -258,11 +259,11 @@ c, j = req("get_active_poll.php", get={"api_token": OLD_TOKEN, "member_id": "0"}
 check("profil seçmeden anket görünüyor", j.get("question") == "Hafta sonu?" and j.get("has_voted") is False, j)
 check("kalan süre ~24 saat", 1430 <= int(j.get("minutes_left", 0)) <= 1440, j.get("minutes_left"))
 poll_id, opt_id = j.get("poll_id"), j["options"][0]["id"]
-sql(f"UPDATE polls SET created_at = NOW() - INTERVAL 25 HOUR WHERE id = {poll_id}")
+sql(f"UPDATE polls SET created_at = NOW() - INTERVAL 25 HOUR, ends_at = NOW() - INTERVAL 1 HOUR WHERE id = {poll_id}")
 c, j = req("get_active_poll.php", get={"api_token": OLD_TOKEN, "member_id": "1"})
 check("süresi dolan anket gösterilmiyor (temizlik çalışmamış olsa da)", j.get("status") == "empty", j)
 c, j = req("vote_poll.php", data={"api_token": OLD_TOKEN, "poll_id": poll_id, "option_id": opt_id, "member_id": "1"})
-check("süresi dolan ankete oy verilemiyor", j.get("message") == "Anket bulunamadı", j)
+check("süresi dolan ankete oy verilemiyor", j.get("message") == "Anket sona erdi", j)
 
 print("14) Uygulama içinden hesap silme")
 req("register.php", data={"house_name": "Silinecek Ev", "email": "silinecek@example.com", "password": "SilSifre123"})
@@ -374,7 +375,86 @@ check("haftalık: geç tamamlansa da aynı gün açılır", next_date("week", "2
 check("günlük: yarın açılır", next_date("day", "2026-10-27", "2026-10-27") == "2026-10-28")
 sql(f"DELETE FROM house_chores WHERE id IN ({rid}, {oid})")
 
-print("17) PHP hata logu")
+print("17) Anket: süre seçimi, erken bitirme, oy değiştirme")
+# Migration'ı eski biçimdeki bir tabloda (is_active/vote_count, ends_at yok) dene
+sql("DELETE FROM polls")
+sql("ALTER TABLE polls DROP COLUMN ends_at, DROP COLUMN created_by, ADD COLUMN is_active tinyint(1) DEFAULT '1'")
+sql("ALTER TABLE poll_options ADD COLUMN vote_count int DEFAULT '0'")
+sql("INSERT INTO polls (house_id, question, created_at) VALUES (1, 'Eski anket', NOW() - INTERVAL 2 HOUR)")
+migration = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "migrations", "2026-10-27_poll_improvements.sql")
+for attempt in ("ilk", "ikinci"):
+    with open(migration, "rb") as f:
+        rc = subprocess.run(MYSQL[:-2], stdin=f, capture_output=True).returncode
+    check(f"migration {attempt} çalıştırmada hatasız", rc == 0, rc)
+check("mevcut anketin bitişi açılıştan 24 saat sonraya kuruldu",
+      sql("SELECT TIMESTAMPDIFF(HOUR, created_at, ends_at) FROM polls WHERE question = 'Eski anket'") == "24")
+check("kullanılmayan kolonlar kaldırıldı", sql(
+    "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'homepal_test' AND "
+    "((table_name = 'polls' AND column_name = 'is_active') OR (table_name = 'poll_options' AND column_name = 'vote_count'))") == "0")
+c, j = req("get_active_poll.php", get={"member_id": "1"}, token=OLD_TOKEN)
+check("migration öncesi açılan anket kalan süresiyle görünüyor", j.get("question") == "Eski anket" and 1315 <= int(j.get("minutes_left", 0)) <= 1320, j)
+
+for bad in (0, 169, "abc"):
+    c, j = req("create_poll.php", json_body={"question": "Film?", "options": ["A", "B"], "duration_hours": bad}, token=OLD_TOKEN)
+    check(f"geçersiz süre ({bad}) reddedildi", j.get("message") == "Geçersiz anket süresi", j)
+c, j = req("create_poll.php", json_body={"question": "Film?", "options": ["A", "B"], "member_id": 3}, token=OLD_TOKEN)
+check("başka evin üyesi anket açan olarak verilemiyor", j.get("message") == "Geçersiz üye", j)
+c, j = req("create_poll.php", json_body={"question": "Film?", "options": ["Komedi", "Korku", "Dram"], "duration_hours": 1, "member_id": 1}, token=OLD_TOKEN)
+check("1 saatlik anket açıldı, eskisinin yerine geçti", j.get("status") == "success" and sql("SELECT COUNT(*) FROM polls WHERE house_id = 1") == "1", j)
+c, j = req("get_active_poll.php", get={"member_id": "2", "include_closed": "1"}, token=OLD_TOKEN)
+members = int(sql("SELECT COUNT(*) FROM home_members WHERE house_id = 1"))
+check("açık, ~1 saat kaldı; açan kişi ve üye sayısı dönüyor",
+      j.get("is_open") is True and 59 <= j.get("minutes_left", 0) <= 60 and j.get("created_by") == 1
+      and j.get("created_by_name") == "Ahmet" and j.get("member_count") == members, j)
+pid, opts = j["poll_id"], [o["id"] for o in j["options"]]
+def poll_counts(extra=None):
+    c, j = req("get_active_poll.php", get={"member_id": "2", "include_closed": "1", **(extra or {})}, token=OLD_TOKEN)
+    return j, [int(o["vote_count"]) for o in j.get("options", [])]
+
+req("vote_poll.php", data={"poll_id": pid, "option_id": opts[0], "member_id": "1"}, token=OLD_TOKEN)
+req("vote_poll.php", data={"poll_id": pid, "option_id": opts[0], "member_id": "2"}, token=OLD_TOKEN)
+c, j = req("vote_poll.php", data={"poll_id": pid, "option_id": opts[1], "member_id": "2"}, token=OLD_TOKEN)
+j2, counts = poll_counts()
+check("oy değiştirildi, sayılar tutarlı", j.get("status") == "success" and counts == [1, 1, 0]
+      and str(j2.get("voted_option_id")) == str(opts[1]), (j, j2))
+
+c, j = req("end_poll.php", data={"poll_id": pid, "member_id": "1"}, token=tokE)
+check("başka evin anketi bitirilemiyor", j.get("status") == "error" and poll_counts()[0].get("is_open") is True, j)
+c, j = req("end_poll.php", data={"poll_id": pid, "member_id": "2"}, token=OLD_TOKEN)
+check("açan kişi dışındaki üye bitiremiyor", j.get("message") == "Anketi sadece açan kişi bitirebilir", j)
+c, j = req("end_poll.php", data={"poll_id": pid}, token=OLD_TOKEN)
+check("üye seçilmeden bitirilemiyor", j.get("message") == "Anketi sadece açan kişi bitirebilir", j)
+c, j = req("create_poll.php", json_body={"question": "Baska?", "options": ["X", "Y"], "member_id": 2}, token=OLD_TOKEN)
+check("başka üye yeni anketle açık anketi silemiyor", j.get("message") == "Açık anketi sadece açan kişi değiştirebilir", j)
+c, j = req("create_poll.php", json_body={"api_token": OLD_TOKEN, "question": "Baska?", "options": ["X", "Y"]})
+check("eski sürüm de açık anketi silemiyor", j.get("status") == "error" and poll_counts()[0].get("poll_id") == pid, j)
+c, j = req("end_poll.php", data={"poll_id": pid, "member_id": "1"}, token=OLD_TOKEN)
+check("açan kişi erken bitirdi", j.get("status") == "success", j)
+c, j = req("end_poll.php", data={"poll_id": pid, "member_id": "2"}, token=OLD_TOKEN)
+check("bitmiş anketi tekrar bitirmek hata vermiyor", j.get("status") == "success", j)
+c, j = req("vote_poll.php", data={"poll_id": pid, "option_id": opts[2], "member_id": "1"}, token=OLD_TOKEN)
+check("biten ankete oy verilemiyor", j.get("message") == "Anket sona erdi", j)
+j2, counts = poll_counts()
+check("biten anket sonuçlarıyla görünüyor (1.3.0+)", j2.get("is_open") is False and j2.get("minutes_left") == 0 and counts == [1, 1, 0], j2)
+c, j = req("get_active_poll.php", get={"member_id": "1"}, token=OLD_TOKEN)
+check("eski sürüme biten anket gösterilmiyor", j.get("status") == "empty", j)
+
+sql(f"UPDATE polls SET ends_at = NOW() - INTERVAL 25 HOUR WHERE id = {pid}")
+check("bitişinden 24 saat sonra sonuç da kalkıyor", poll_counts()[0].get("status") == "empty")
+req("create_poll.php", json_body={"question": "Kalsin mi?", "options": ["Evet", "Hayir"]}, token=tokE)
+out = run_cron()
+check("cron eski sonucu sildi, açık ankete dokunmadı",
+      "Silinen anket sayısı: 1" in out and sql(f"SELECT COUNT(*) FROM polls WHERE id = {pid}") == "0"
+      and sql("SELECT COUNT(*) FROM polls WHERE question = 'Kalsin mi?'") == "1", out)
+c, j = req("create_poll.php", json_body={"api_token": OLD_TOKEN, "question": "Sahipsiz", "options": ["X", "Y"]})
+check("açanı belli olmayan (eski sürüm) anketin yerine yenisi açılabiliyor", j.get("status") == "success", j)
+pid = poll_counts()[0].get("poll_id")
+c, j = req("end_poll.php", data={"poll_id": pid}, token=OLD_TOKEN)
+check("açanı belli olmayan anketi herkes bitirebiliyor", j.get("status") == "success" and poll_counts()[0].get("is_open") is False, j)
+c, j = req("create_poll.php", json_body={"question": "Yeni", "options": ["X", "Y"], "member_id": 2}, token=OLD_TOKEN)
+check("biten anketin yerine herkes yenisini açabiliyor", j.get("status") == "success", j)
+
+print("18) PHP hata logu")
 errs = open(PHP_ERRORS, encoding="utf-8", errors="replace").read() if os.path.exists(PHP_ERRORS) else ""
 bad = [l for l in errs.splitlines() if re.search(r"PHP (Warning|Fatal|Notice|Deprecated)", l)]
 check("PHP uyarı/hata logu temiz", not bad, "\n" + "\n".join(bad[:8]))

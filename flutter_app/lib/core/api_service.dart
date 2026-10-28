@@ -291,8 +291,9 @@ class ApiService {
 
   // ---------- Anket ----------
 
+  // include_closed: biten anket de sonuçlarıyla gelir (is_open: false)
   static Future<Map<String, dynamic>> getActivePoll(int houseId, int memberId) =>
-      _getMap("get_active_poll.php", {"member_id": memberId.toString()});
+      _getMap("get_active_poll.php", {"member_id": memberId.toString(), "include_closed": "1"});
 
   static Future<bool> votePoll(int pollId, int optionId, int houseId, int memberId) =>
       _postForSuccess("vote_poll.php", {
@@ -301,14 +302,25 @@ class ApiService {
         "member_id": memberId.toString(),
       });
 
-  static Future<bool> createPoll(int houseId, String question, List<String> options) async {
+  // memberId: anketi açan kişi (ona bildirim gitmez); profil seçilmediyse null
+  static Future<bool> createPoll(int houseId, String question, List<String> options,
+      {int durationHours = 24, int? memberId}) async {
     try {
-      return _isSuccess(await _postJson("create_poll.php", {"question": question, "options": options}));
+      return _isSuccess(await _postJson("create_poll.php", {
+        "question": question,
+        "options": options,
+        "duration_hours": durationHours,
+        if (memberId != null) "member_id": memberId,
+      }));
     } catch (e) {
       debugPrint("create_poll.php hatası: $e");
       return false;
     }
   }
+
+  // Açanı belli olan anketi sadece açan kişi bitirebilir (memberId: "Ben kimim?", seçilmediyse 0)
+  static Future<bool> endPoll(int pollId, int memberId) =>
+      _postForSuccess("end_poll.php", {"poll_id": pollId.toString(), "member_id": memberId.toString()});
 }
 
 // ==========================================

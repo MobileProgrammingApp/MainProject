@@ -39,7 +39,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool hasVoted = false;
   int? activePollId;
   int? votedOptionId;
-  int pollMinutesLeft = 0; // anket 24 saat sonra kapanır (sunucu siler)
+  // Anket seçilen süre dolunca veya biri bitirince kapanır; sonuç 24 saat daha görünür
+  bool pollIsOpen = true;
+  int pollMinutesLeft = 0;
+  // Açanı belli olan açık anketi sadece o bitirebilir veya yenisiyle değiştirebilir
+  int? pollCreatorId;
+  String? pollCreatedBy;
+  int pollMemberCount = 0;
+  bool _pollBusy = false; // oy/bitirme isteği sürerken art arda dokunulmasın
   // Sunucudan en az bir kez veri geldi mi? Gelmediyse (ör. internet yok)
   // "0 iş" / "aktif anket yok" yerine "alınamadı" gösterilir.
   bool _statsLoaded = false;
@@ -120,6 +127,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         hasVoted = pollData['has_voted'] == true;
         votedOptionId = pollData['voted_option_id'] != null ? int.parse(pollData['voted_option_id'].toString()) : null;
         pollMinutesLeft = int.tryParse('${pollData['minutes_left'] ?? 0}') ?? 0;
+        pollIsOpen = pollData['is_open'] != false;
+        pollCreatorId = int.tryParse('${pollData['created_by']}');
+        pollCreatedBy = pollData['created_by_name'] as String?;
+        pollMemberCount = int.tryParse('${pollData['member_count'] ?? 0}') ?? 0;
         _pollLoaded = true;
       } else if (pollData['status'] == 'empty') {
         hasActivePoll = false;
@@ -139,25 +150,42 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return;
     }
 
-    if (hasVoted) return;
+    // Anket açıkken oy değiştirilebilir; aynı seçeneğe tekrar dokunmak bir şey yapmaz
+    if (!pollIsOpen || optionId == votedOptionId || _pollBusy) return;
+    final changing = hasVoted;
 
-    bool success = await ApiService.votePoll(activePollId!, optionId, currentHouseId!, currentMemberId!);
-    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    _pollBusy = true;
+    final success = await ApiService.votePoll(activePollId!, optionId, currentHouseId!, currentMemberId!);
+    // Başarısızsa anket bu arada bitmiş olabilir: güncel hâli gösterilsin
+    await _loadHomeData(isSilent: true);
+    _pollBusy = false;
 
-    if (success) {
-      await _loadHomeData(isSilent: true);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Oyunuz kaydedildi!")));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Oy kaydedilemedi.")));
-    }
+    messenger.showSnackBar(SnackBar(
+      content: Text(success ? (changing ? "Oyunuz değiştirildi" : "Oyunuz kaydedildi!") : "Oy kaydedilemedi."),
+    ));
   }
 
-  Future<void> _createPoll(String question, List<String> options) async {
+  Future<void> _endPoll() async {
+    final pollId = activePollId;
+    if (pollId == null || _pollBusy) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    _pollBusy = true;
+    final success = await ApiService.endPoll(pollId, currentMemberId ?? 0);
+    await _loadHomeData(isSilent: true);
+    _pollBusy = false;
+
+    messenger.showSnackBar(SnackBar(content: Text(success ? "Anket bitirildi" : "Anket bitirilemedi.")));
+  }
+
+  Future<void> _createPoll(String question, List<String> options, int durationHours) async {
     final houseId = currentHouseId;
     if (houseId == null) return;
 
     final messenger = ScaffoldMessenger.of(context);
-    final success = await ApiService.createPoll(houseId, question, options);
+    final success = await ApiService.createPoll(houseId, question, options,
+        durationHours: durationHours, memberId: currentMemberId);
     if (success) {
       await _loadHomeData(isSilent: true);
       messenger.showSnackBar(const SnackBar(content: Text("Anket oluşturuldu!")));
@@ -229,16 +257,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               ],
             ),
             const SizedBox(height: 24),
-            SectionHeader(
-              title: "Ev anketi",
-              action: hasActivePoll
-                  ? TextButton.icon(
-                      onPressed: _confirmReplacePoll,
-                      icon: const Icon(Icons.add_rounded, size: 18),
-                      label: const Text("Yeni anket"),
-                    )
-                  : null,
-            ),
+            const SectionHeader(title: "Ev anketi"),
             _buildPollSection(),
             const SizedBox(height: 24),
             const SectionHeader(title: "Kısayollar"),
@@ -383,10 +402,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
 
-    // Aktif anket varsa: oylama / sonuçlar
-    int totalVotes = 0;
-    for (var opt in pollOptions) {
-      totalVotes += int.parse(opt['vote_count'].toString());
+    // Anket varsa: oylama / sonuçlar. Sonuçlar oy verince veya anket bitince görünür.
+    final counts = [for (final opt in pollOptions) int.parse(opt['vote_count'].toString())];
+    final totalVotes = counts.fold(0, (sum, c) => sum + c);
+    final topVotes = counts.fold(0, (top, c) => c > top ? c : top);
+    final showResult = hasVoted || !pollIsOpen;
+
+    Widget optionBar(int i) {
+      final optionId = int.parse(pollOptions[i]['id'].toString());
+      return _PollOptionBar(
+        text: pollOptions[i]['option_text'],
+        percent: totalVotes == 0 ? 0.0 : counts[i] / totalVotes,
+        voteCount: counts[i],
+        showResult: showResult,
+        isMyChoice: votedOptionId == optionId,
+        isWinner: !pollIsOpen && topVotes > 0 && counts[i] == topVotes,
+        onTap: pollIsOpen ? () => _handleVote(optionId) : null,
+      );
     }
 
     return Container(
@@ -401,37 +433,83 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 child: Text(pollQuestion,
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppStyles.textColor)),
               ),
-              if (hasVoted)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: AppStyles.successSoft, borderRadius: BorderRadius.circular(20)),
-                  child: const Text("Oy verildi",
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppStyles.successColor)),
-                ),
+              if (!pollIsOpen)
+                _pollBadge("Bitti", AppStyles.mutedTextColor, const Color(0xFFEDEFF3))
+              else if (hasVoted)
+                _pollBadge("Oy verildi", AppStyles.successColor, AppStyles.successSoft),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            "${hasVoted ? "$totalVotes oy kullanıldı" : "Oy vermek için bir seçeneğe dokunun"} • $_timeLeft",
+            [if (pollCreatedBy != null) "$pollCreatedBy sordu", pollIsOpen ? _timeLeft : "Anket sona erdi"].join(" • "),
             style: AppStyles.listTileSubtitle,
           ),
           const SizedBox(height: 16),
-          ...pollOptions.map((option) {
-            final voteCount = int.parse(option['vote_count'].toString());
-            final optionId = int.parse(option['id'].toString());
-            final percent = totalVotes == 0 ? 0.0 : voteCount / totalVotes;
-            return _PollOptionBar(
-              text: option['option_text'],
-              percent: percent,
-              voteCount: voteCount,
-              showResult: hasVoted,
-              isMyChoice: votedOptionId == optionId,
-              onTap: hasVoted ? null : () => _handleVote(optionId),
-            );
-          }),
+          for (var i = 0; i < pollOptions.length; i++) optionBar(i),
+          const SizedBox(height: 2),
+          // Herkesin tek oyu olduğu için toplam oy, oy veren kişi sayısıdır
+          Text(_pollHint(totalVotes), style: AppStyles.listTileSubtitle),
+          if (!pollIsOpen)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: _showCreatePollDialog,
+                  style: FilledButton.styleFrom(backgroundColor: AppStyles.accentColor),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text("Yeni anket"),
+                ),
+              ),
+            )
+          else if (_canManagePoll)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _confirmEndPoll,
+                    icon: const Icon(Icons.flag_outlined, size: 18),
+                    label: const Text("Anketi bitir"),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: _confirmReplacePoll,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text("Yeni anket"),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  // Açık anketi açan kişi (ya da açanı belli değilse herkes) bitirebilir/değiştirebilir;
+  // sunucu da aynı kuralı uygular (end_poll.php, create_poll.php)
+  bool get _canManagePoll => pollCreatorId == null || pollCreatorId == currentMemberId;
+
+  Widget _pollBadge(String text, Color color, Color background) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(20)),
+      child: Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
+    );
+  }
+
+  // Seçeneklerin altındaki kısa açıklama: katılım ve ne yapılabileceği
+  String _pollHint(int voters) {
+    final turnout = voters == 0
+        ? (pollIsOpen ? "Henüz oy veren yok" : "Kimse oy vermedi")
+        : (pollMemberCount > 0 ? "$voters/$pollMemberCount kişi oy verdi" : "$voters kişi oy verdi");
+    if (!pollIsOpen) return turnout;
+    final parts = [
+      hasVoted ? turnout : "Oy vermek için bir seçeneğe dokunun • $turnout",
+      if (hasVoted) "Fikrin değişirse başka seçeneğe dokun",
+      if (!_canManagePoll && pollCreatedBy != null) "Anketi $pollCreatedBy bitirebilir",
+    ];
+    return parts.join(" • ");
   }
 
   Widget _buildShortcuts() {
@@ -459,14 +537,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  // Anket oluşturma penceresi
   String get _timeLeft {
-    if (pollMinutesLeft >= 60) return "${pollMinutesLeft ~/ 60} saat sonra kapanır";
-    if (pollMinutesLeft > 0) return "$pollMinutesLeft dakika sonra kapanır";
+    if (pollMinutesLeft >= 48 * 60) return "${pollMinutesLeft ~/ (24 * 60)} gün kaldı";
+    if (pollMinutesLeft >= 60) return "${pollMinutesLeft ~/ 60} saat kaldı";
+    if (pollMinutesLeft > 0) return "$pollMinutesLeft dakika kaldı";
     return "kapanmak üzere";
   }
 
-  // Evde tek aktif anket olur; yenisi açılınca eskisi ve oyları silinir
+  Future<void> _confirmEndPoll() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Anket bitirilsin mi?"),
+        content: const Text("Oylama kapanır ve sonuç herkese görünür."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Vazgeç")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Bitir")),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) _endPoll();
+  }
+
+  // Evde tek anket olur; yenisi açılınca açık olan anket ve oyları silinir
   Future<void> _confirmReplacePoll() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -482,9 +575,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (confirmed == true && mounted) _showCreatePollDialog();
   }
 
+  // Anket oluşturma penceresi
   void _showCreatePollDialog() {
     final questionCtrl = TextEditingController();
     final optionCtrls = [TextEditingController(), TextEditingController()];
+    var durationHours = 24;
 
     showModalBottomSheet(
       context: context,
@@ -499,7 +594,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               children: [
                 const Text("Yeni anket", style: AppStyles.popupHeader),
                 const SizedBox(height: 4),
-                const Text("Anket 24 saat açık kalır; evdeki herkese bildirim gider.", style: AppStyles.listTileSubtitle),
+                const Text("Evdeki herkese bildirim gider; istediğin zaman bitirebilirsin.",
+                    style: AppStyles.listTileSubtitle),
                 const SizedBox(height: 16),
                 TextField(
                   controller: questionCtrl,
@@ -531,7 +627,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       label: const Text("Seçenek ekle"),
                     ),
                   ),
+                const SizedBox(height: 10),
+                const Text("Ne kadar açık kalsın?", style: AppStyles.listTileSubtitle),
                 const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  initialValue: durationHours,
+                  isExpanded: true,
+                  borderRadius: BorderRadius.circular(AppStyles.radius),
+                  decoration: const InputDecoration(prefixIcon: Icon(Icons.timer_outlined)),
+                  items: [
+                    for (final entry in _pollDurations.entries)
+                      DropdownMenuItem(value: entry.key, child: Text(entry.value)),
+                  ],
+                  onChanged: (value) => setSheetState(() => durationHours = value ?? durationHours),
+                ),
+                const SizedBox(height: 18),
                 FilledButton(
                   onPressed: () {
                     final q = questionCtrl.text.trim();
@@ -543,7 +653,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       return;
                     }
                     Navigator.pop(ctx);
-                    _createPoll(q, opts);
+                    _createPoll(q, opts, durationHours);
                   },
                   child: const Text("Anketi başlat"),
                 ),
@@ -555,6 +665,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 }
+
+// Anket süresi seçenekleri (saat); sunucu en fazla 1 hafta kabul eder
+const _pollDurations = {1: "1 saat", 24: "1 gün", 72: "3 gün", 168: "1 hafta"};
 
 class _SummaryCard extends StatelessWidget {
   final IconData icon;
@@ -622,6 +735,7 @@ class _PollOptionBar extends StatelessWidget {
   final int voteCount;
   final bool showResult;
   final bool isMyChoice;
+  final bool isWinner; // biten ankette en çok oyu alan (berabere ise hepsi)
   final VoidCallback? onTap;
 
   const _PollOptionBar({
@@ -630,6 +744,7 @@ class _PollOptionBar extends StatelessWidget {
     required this.voteCount,
     required this.showResult,
     required this.isMyChoice,
+    required this.isWinner,
     required this.onTap,
   });
 
@@ -659,6 +774,10 @@ class _PollOptionBar extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
                 child: Row(
                   children: [
+                    if (isWinner) ...[
+                      const Icon(Icons.emoji_events_rounded, size: 18, color: AppStyles.accentColor),
+                      const SizedBox(width: 8),
+                    ],
                     if (isMyChoice) ...[
                       const Icon(Icons.check_circle_rounded, size: 18, color: AppStyles.primaryColor),
                       const SizedBox(width: 8),
@@ -667,7 +786,7 @@ class _PollOptionBar extends StatelessWidget {
                       child: Text(
                         text,
                         style: TextStyle(
-                          fontWeight: isMyChoice ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: isMyChoice || isWinner ? FontWeight.w700 : FontWeight.w500,
                           color: AppStyles.textColor,
                         ),
                       ),

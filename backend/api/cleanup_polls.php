@@ -11,13 +11,14 @@ if (php_sapi_name() !== 'cli') {
 
 include __DIR__ . '/db.php';
 require_once __DIR__ . '/chores_helper.php';
+require_once __DIR__ . '/polls_helper.php';
 
 // Günü gelen tekrarlı görevler (sabah 08:00'den sonraki ilk çalışmada açılır)
 $chores = reopenDueChores($conn);
 echo "Yeniden açılan görev: $chores\n";
 
-// 24 saatten eski anketler
-$deleted = $conn->exec("DELETE FROM polls WHERE created_at < (NOW() - INTERVAL 24 HOUR)");
+// Biteli 24 saati geçen anketler (bitince sonuçları bu süre boyunca görünür)
+$deleted = $conn->exec("DELETE FROM polls WHERE ends_at < (NOW() - INTERVAL " . POLL_RESULT_HOURS . " HOUR)");
 echo "Silinen anket sayısı: $deleted\n";
 
 // Deneme sınırı kayıtları (en uzun pencere 1 saat)

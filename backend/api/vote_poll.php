@@ -14,11 +14,15 @@ if (!memberBelongsToHouse($conn, $member_id, $house_id)) {
 }
 
 try {
-    // Süresi dolan (24 saat) ankete oy verilemez; bkz. get_active_poll.php
-    $pollCheck = $conn->prepare("SELECT id FROM polls WHERE id = ? AND house_id = ? AND created_at > NOW() - INTERVAL 24 HOUR");
+    $pollCheck = $conn->prepare("SELECT ends_at > NOW() AS is_open FROM polls WHERE id = ? AND house_id = ?");
     $pollCheck->execute([$poll_id, $house_id]);
-    if (!$pollCheck->fetch(PDO::FETCH_ASSOC)) {
+    $poll = $pollCheck->fetch(PDO::FETCH_ASSOC);
+    if (!$poll) {
         jsonError("Anket bulunamadı");
+    }
+    // Süresi dolan veya erken bitirilen ankete oy verilemez
+    if (!$poll['is_open']) {
+        jsonError("Anket sona erdi");
     }
 
     $optionCheck = $conn->prepare("SELECT id FROM poll_options WHERE id = ? AND poll_id = ?");
@@ -27,25 +31,15 @@ try {
         jsonError("Geçersiz seçenek");
     }
 
-    // Oy ve sayaç birlikte yazılsın. Aynı anda gelen iki istekte çift oyu
-    // poll_votes'taki UNIQUE (poll_id, member_id) indeksi engeller.
-    $conn->beginTransaction();
-
-    $insert = $conn->prepare("INSERT INTO poll_votes (poll_id, house_id, member_id, option_id) VALUES (?, ?, ?, ?)");
-    $insert->execute([$poll_id, $house_id, $member_id, $option_id]);
-
-    $update = $conn->prepare("UPDATE poll_options SET vote_count = vote_count + 1 WHERE id = ?");
-    $update->execute([$option_id]);
-
-    $conn->commit();
+    // Anket açıkken oy değiştirilebilir. Üye başına tek satırı poll_votes'taki
+    // UNIQUE (poll_id, member_id) indeksi garanti eder (aynı anda gelen isteklerde de).
+    $vote = $conn->prepare(
+        "INSERT INTO poll_votes (poll_id, house_id, member_id, option_id) VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE option_id = VALUES(option_id), created_at = CURRENT_TIMESTAMP"
+    );
+    $vote->execute([$poll_id, $house_id, $member_id, $option_id]);
 
     echo json_encode(["status" => "success"]);
-} catch (PDOException $e) {
-    if ($conn->inTransaction()) {
-        $conn->rollBack();
-    }
-    if ($e->getCode() === '23000') {
-        jsonError("Zaten oy kullandınız");
-    }
+} catch (Exception $e) {
     serverError($e);
 }
