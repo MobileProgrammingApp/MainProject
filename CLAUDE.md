@@ -44,6 +44,10 @@ Flutter mobil uygulaması (ev/ev arkadaşları için görev, market listesi, ev 
 - Gradle: `com.google.firebase.crashlytics` eklentisi google-services 4.4.1+ ister. Release derlemede R8 mapping dosyası otomatik yüklenir, yani `flutter build appbundle` sırasında internet gerekir.
 - Raporlara kullanıcı kimliği/e-posta eklenmiyor; bu yüzden gizlilik politikası ve Play veri güvenliği formunda sadece "çökme günlükleri, tanılama, cihaz kimliği" beyan ediliyor. Kimlik eklenecekse ikisi de güncellenmeli.
 
+## Android derleme
+- Gradle 9.3.1, AGP 9.1.0, Kotlin 2.4.0, Java 17. Bunlar Flutter 3.47'nin yeni proje şablonuyla aynı. `gradle.properties`'te `android.builtInKotlin=false` ve `android.newDsl=false`, eklentiler AGP 9'un yeni yollarına geçene kadar kalmalı. Kotlin eklentisini app modülüne Flutter eklentisi uygular; `app/build.gradle.kts`'e `kotlin-android` eklemeyin.
+- Derlemede "plugins that apply KGP" uyarısı çıkıyor (firebase_core, firebase_crashlytics). Şimdilik derlemeye engel değil. Çözüm FlutterFire'ın yeni ana sürümüne (core 5 / crashlytics 6 / messaging 17) geçmek olabilir. Geçerken bildirimleri (ön plan, arka plan, dokunma) tekrar test edin.
+
 ## Play Store
 - Paket adı: `com.swordarchitecture.homepal` (değiştirilemez, kalıcı).
 - **KRİTİK — asla kaybetmeyin**: Release imzalama anahtarı `flutter_app/android/homepal-release-key.jks` ve `flutter_app/android/key.properties` — **gitignore'da, repo'da yoklar**. Bu dosyaları kaybederseniz Play Store'daki uygulamayı bir daha güncelleyemezsiniz (yeni bir uygulama gibi yayınlamanız gerekir). Bilgisayar formatlanmadan/değişmeden önce bu iki dosyayı ayrıca yedekleyin (USB, bulut depolama vb.).
