@@ -1,26 +1,17 @@
 <?php
 
 /**
- * İstekteki oturum token'ını okur. Yeni sürümler "Authorization: Bearer"
- * başlığını kullanır (URL'de ve sunucu loglarında görünmez); Play Store'daki
- * eski sürümler için api_token form/query/JSON alanı da kabul edilir.
+ * İstekteki oturum token'ını "Authorization: Bearer" başlığından okur (URL'de ve
+ * sunucu loglarında görünmez). 1.0.2 ve öncesinin gönderdiği api_token
+ * form/query/JSON alanı 2026-10-29'dan beri kabul edilmiyor: o sürümlerden
+ * 25 Ekim'den sonra hiç istek gelmemişti (nginx logları).
  */
 function getRequestToken(): string {
     $header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
     if (stripos($header, 'Bearer ') === 0) {
         return trim(substr($header, 7));
     }
-
-    $token = $_POST['api_token'] ?? $_GET['api_token'] ?? null;
-
-    // Bazı endpoint'ler form-data yerine ham JSON body kullanıyor
-    // (create_poll.php gibi); orada da api_token alanını kabul et.
-    if (!$token && stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== false) {
-        $jsonBody = json_decode(file_get_contents('php://input'), true);
-        $token = $jsonBody['api_token'] ?? null;
-    }
-
-    return is_string($token) ? $token : '';
+    return '';
 }
 
 /**
