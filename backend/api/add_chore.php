@@ -19,11 +19,8 @@ try {
     $stmt = $conn->prepare("INSERT INTO house_chores (creator_id, assigned_to_id, task_name, repeat_every, repeat_start, rotate) VALUES (?, ?, ?, ?, ?, ?)");
     $stmt->execute([$user['id'], $assigned_to_id, $task_name, $repeat, $repeat ? choreToday()->format('Y-m-d') : null, (int) $rotate]);
 
-    $tokenStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE id = ?");
-    $tokenStmt->execute([$assigned_to_id]);
-
     // Görev zaten eklendi; bildirim gönderilemese de istemciye başarı dönüyoruz
-    notifyMembers($conn, [$tokenStmt->fetchColumn()], "Yeni Görev!", "Sana bir görev atandı: " . $task_name, "chores");
+    notifyMembers($conn, memberTokens($conn, $assigned_to_id), "Yeni Görev!", "Sana bir görev atandı: " . $task_name, "chores");
 
     echo json_encode(["status" => "success"]);
 } catch (Exception $e) {

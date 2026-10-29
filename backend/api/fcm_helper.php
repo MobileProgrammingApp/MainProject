@@ -60,7 +60,7 @@ function sendFCMNotificationV1($projectId, $keyFilePath, $targetToken, $title, $
 
     // NOT_FOUND / UNREGISTERED: cihaz token'ı artık yok, bir daha denemeye gerek yok
     if ($conn && in_array($status, ['NOT_FOUND', 'UNREGISTERED'], true)) {
-        $conn->prepare("UPDATE home_members SET fcm_token = NULL WHERE fcm_token = ?")->execute([$targetToken]);
+        $conn->prepare("DELETE FROM member_devices WHERE fcm_token = ?")->execute([$targetToken]);
     }
 
     error_log("[homepal] FCM gönderimi başarısız: $status");
@@ -68,18 +68,48 @@ function sendFCMNotificationV1($projectId, $keyFilePath, $targetToken, $title, $
 }
 
 /**
+ * Bir üyenin bütün cihazlarının token'ları (aynı kişi telefonunda ve
+ * tabletinde HomePal kullanabilir). Bir cihaz ise tek üyeye bağlıdır.
+ */
+function memberTokens(PDO $conn, int $memberId): array {
+    $stmt = $conn->prepare("SELECT fcm_token FROM member_devices WHERE member_id = ?");
+    $stmt->execute([$memberId]);
+    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
+
+/** Evdeki bütün üyelerin cihaz token'ları; $exceptMemberId verilirse o kişinin cihazları hariç. */
+function houseTokens(PDO $conn, int $houseId, ?int $exceptMemberId = null): array {
+    $stmt = $conn->prepare(
+        "SELECT d.fcm_token FROM member_devices d JOIN home_members m ON m.id = d.member_id
+         WHERE m.house_id = ? AND m.id != ?"
+    );
+    $stmt->execute([$houseId, $exceptMemberId ?? 0]);
+    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
+
+/**
  * Bir liste FCM token'ına aynı bildirimi gönderir. Firebase ayarlı değilse
  * sessizce atlar; tek tek hatalar diğer alıcılara gönderimi engellemesin diye
- * loglanıp geçilir. Aynı cihaz birden fazla üyede kayıtlıysa tek bildirim gider.
+ * loglanıp geçilir. Aynı token listede iki kez varsa tek bildirim gider.
  */
 function notifyMembers(PDO $conn, array $tokens, string $title, string $body, string $screen = ''): void {
+    $tokens = array_values(array_unique(array_filter($tokens)));
+
+    // Sadece testlerde (run_tests.py): gönderilmez, alıcılar dosyaya yazılır
+    if (!empty($_ENV['FCM_TEST_LOG'])) {
+        if ($tokens) {
+            file_put_contents($_ENV['FCM_TEST_LOG'], json_encode(compact('tokens', 'title', 'body', 'screen'), JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+        }
+        return;
+    }
+
     $projectId = $_ENV['PROJECT_ID'] ?? null;
     $keyFilePath = $_ENV['KEY_FILEPATH'] ?? null;
     if (!$projectId || !$keyFilePath) {
         return;
     }
 
-    foreach (array_unique(array_filter($tokens)) as $token) {
+    foreach ($tokens as $token) {
         try {
             sendFCMNotificationV1($projectId, $keyFilePath, $token, $title, $body, $conn, $screen);
         } catch (Throwable $e) {

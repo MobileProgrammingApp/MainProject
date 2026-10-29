@@ -17,11 +17,8 @@ try {
     $stmt = $conn->prepare("INSERT INTO shopping_list (user_id, item_name, is_bought, added_by_member_id) VALUES (?, ?, 0, ?)");
     $stmt->execute([$user['id'], $item_name, $member_id]);
 
-    // Ekleyen üye biliniyorsa ona bildirim gitmez
-    $membersStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE house_id = ? AND id != ?");
-    $membersStmt->execute([$user['id'], $member_id ?? 0]);
-
-    notifyMembers($conn, $membersStmt->fetchAll(PDO::FETCH_COLUMN), "Market Listesi", "\"$item_name\" listeye eklendi.", "shopping");
+    // Ekleyen üye biliniyorsa ona (hiçbir cihazına) bildirim gitmez
+    notifyMembers($conn, houseTokens($conn, (int) $user['id'], $member_id), "Market Listesi", "\"$item_name\" listeye eklendi.", "shopping");
 
     echo json_encode(["status" => "success"]);
 } catch (Exception $e) {

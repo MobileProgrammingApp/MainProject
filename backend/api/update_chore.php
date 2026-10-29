@@ -23,12 +23,9 @@ try {
     $assigneeStmt->execute([$chore['assigned_to_id']]);
     $assigneeName = $assigneeStmt->fetchColumn() ?: 'Bir ev arkadaşı';
 
-    $membersStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE house_id = ? AND id != ?");
-    $membersStmt->execute([$user['id'], $chore['assigned_to_id']]);
-
     notifyMembers(
         $conn,
-        $membersStmt->fetchAll(PDO::FETCH_COLUMN),
+        houseTokens($conn, (int) $user['id'], (int) $chore['assigned_to_id']),
         "Görev Tamamlandı",
         $assigneeName . " \"" . $chore['task_name'] . "\" görevini tamamladı.",
         "chores"

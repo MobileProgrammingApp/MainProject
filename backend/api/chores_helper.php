@@ -113,11 +113,9 @@ function reopenDueChores(PDO $conn, ?int $houseId = null): int {
         }
         $reopened++;
 
-        $tokenStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE id = ?");
-        $tokenStmt->execute([$assignee]);
         notifyMembers(
             $conn,
-            [$tokenStmt->fetchColumn()],
+            memberTokens($conn, $assignee),
             $chore['rotate'] ? "Sıra sende!" : "Görev zamanı",
             "\"" . $chore['task_name'] . "\" görevi seni bekliyor.",
             "chores"

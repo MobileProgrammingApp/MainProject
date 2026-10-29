@@ -75,7 +75,9 @@ def main():
         with open(os.path.join(app, "api", ".env"), "w", encoding="utf-8") as f:
             f.write(f"DB_HOST=127.0.0.1;port={DB_PORT}\nDB_NAME=homepal_test\nDB_USER=root\nDB_PASS=\n"
                     "PROJECT_ID=\nKEY_FILEPATH=\nMAIL_USERNAME=test@example.com\nMAIL_PASSWORD=x\n"
-                    f"APP_URL=http://127.0.0.1:{WEB_PORT}\n")
+                    f"APP_URL=http://127.0.0.1:{WEB_PORT}\n"
+                    # Bildirimler gönderilmez, alıcıları bu dosyaya yazılır (fcm_helper.php)
+                    f"FCM_TEST_LOG={os.path.join(app, 'fcm.log')}\n")
 
         # 2) İzole MariaDB
         datadir = os.path.join(tmp, "db")
@@ -106,6 +108,7 @@ def main():
         env = dict(os.environ, PYTHONIOENCODING="utf-8",
                    HOMEPAL_TEST_BASE=f"http://127.0.0.1:{WEB_PORT}",
                    HOMEPAL_TEST_MAILS=os.path.join(app, "mails.log"),
+                   HOMEPAL_TEST_FCM=os.path.join(app, "fcm.log"),
                    HOMEPAL_TEST_PHP_ERRORS=errors_log,
                    HOMEPAL_TEST_PHP=php,
                    HOMEPAL_TEST_API_DIR=os.path.join(app, "api"),

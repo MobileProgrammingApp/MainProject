@@ -9,8 +9,10 @@ INSERT INTO users (id, house_name, email, password, email_verified, verification
 INSERT INTO api_tokens (user_id, token_hash, last_used_at) VALUES
   (1, SHA2(REPEAT('a', 64), 256), NOW());
 
--- Aynı cihaz token'ı iki üyede (profil değiştirme senaryosu)
-INSERT INTO home_members (id, house_id, name, fcm_token) VALUES
-  (1, 1, 'Ahmet', 'tokA'),
-  (2, 1, 'Ayse', 'tokA'),
-  (3, 2, 'Baska', NULL);
+INSERT INTO home_members (id, house_id, name) VALUES
+  (1, 1, 'Ahmet'),
+  (2, 1, 'Ayse'),
+  (3, 2, 'Baska');
+
+-- Ahmet'in bildirim alan bir cihazı
+INSERT INTO member_devices (member_id, fcm_token) VALUES (1, 'tokA');

@@ -1,8 +1,10 @@
 <?php
 include 'db.php';
-require_once __DIR__ . '/fcm_helper.php';
 require_once __DIR__ . '/auth.php';
 require_once __DIR__ . '/polls_helper.php';
+
+// Yeni anket açar. Evde aynı anda birden fazla anket olabilir: açık ya da biten
+// anketler yerinde kalır (1.2.0'a kadar yenisi eskisini siliyordu).
 
 const MAX_POLL_OPTIONS = 10;
 
@@ -47,33 +49,22 @@ if (!empty($data['member_id'])) {
 }
 
 try {
-    // Yeni anket açık olanın yerine geçtiği için, açık anketi de sadece açan kişi
-    // değiştirebilir (bkz. end_poll.php). Biten anketin yerine herkes yenisini açabilir.
-    $openStmt = $conn->prepare(
-        "SELECT m.id AS creator
-         FROM polls p
-         LEFT JOIN home_members m ON m.id = p.created_by
-         WHERE p.house_id = ? AND p.ends_at > NOW() AND m.id IS NOT NULL AND m.id != ?
-         LIMIT 1"
-    );
-    $openStmt->execute([$house_id, $creator_id ?? 0]);
-    if ($openStmt->fetch(PDO::FETCH_ASSOC)) {
-        jsonError("Açık anketi sadece açan kişi değiştirebilir");
+    $openStmt = $conn->prepare("SELECT COUNT(*) FROM polls WHERE house_id = ? AND ends_at > NOW()");
+    $openStmt->execute([$house_id]);
+    if ((int) $openStmt->fetchColumn() >= MAX_OPEN_POLLS) {
+        jsonError("Aynı anda en fazla " . MAX_OPEN_POLLS . " anket açık olabilir");
     }
 
     $conn->beginTransaction();
 
-    // 1. Varsa eski anketleri sil (Evde tek anket olsun diye)
-    $conn->prepare("DELETE FROM polls WHERE house_id = ?")->execute([$house_id]);
-
-    // 2. Yeni Anketi Oluştur
+    // 1. Yeni Anketi Oluştur
     $stmt = $conn->prepare(
         "INSERT INTO polls (house_id, question, ends_at, created_by) VALUES (?, ?, NOW() + INTERVAL ? HOUR, ?)"
     );
     $stmt->execute([$house_id, $question, $hours, $creator_id]);
     $poll_id = $conn->lastInsertId();
 
-    // 3. Seçenekleri Ekle
+    // 2. Seçenekleri Ekle
     $stmtOpt = $conn->prepare("INSERT INTO poll_options (poll_id, option_text) VALUES (?, ?)");
     foreach ($options as $opt) {
         $stmtOpt->execute([$poll_id, $opt]);
@@ -81,11 +72,9 @@ try {
 
     $conn->commit();
 
-    $membersStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE house_id = ? AND id != ?");
-    $membersStmt->execute([$house_id, $creator_id ?? 0]);
-    notifyMembers($conn, $membersStmt->fetchAll(PDO::FETCH_COLUMN), "Yeni Anket", $question, "home");
+    notifyMembers($conn, houseTokens($conn, (int) $house_id, $creator_id), "Yeni Anket", $question, "home");
 
-    echo json_encode(["status" => "success"]);
+    echo json_encode(["status" => "success", "poll_id" => (int) $poll_id]);
 } catch (Exception $e) {
     if ($conn->inTransaction()) {
         $conn->rollBack();

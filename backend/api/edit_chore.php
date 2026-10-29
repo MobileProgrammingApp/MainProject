@@ -40,9 +40,7 @@ try {
     // Görev başka birine verildiyse yeni sorumlusu haberdar olsun; sadece adı
     // düzeltildiyse kimseye bildirim gitmez
     if ((int) $chore['assigned_to_id'] !== $assigned_to_id && !$chore['is_done']) {
-        $tokenStmt = $conn->prepare("SELECT fcm_token FROM home_members WHERE id = ?");
-        $tokenStmt->execute([$assigned_to_id]);
-        notifyMembers($conn, [$tokenStmt->fetchColumn()], "Yeni Görev!", "Sana bir görev atandı: " . $task_name, "chores");
+        notifyMembers($conn, memberTokens($conn, $assigned_to_id), "Yeni Görev!", "Sana bir görev atandı: " . $task_name, "chores");
     }
     echo json_encode(["status" => "success"]);
 } catch (Exception $e) {

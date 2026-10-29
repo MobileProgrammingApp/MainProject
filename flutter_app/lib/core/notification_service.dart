@@ -101,31 +101,40 @@ class NotificationService {
     );
   }
 
-  /// Bildirim aç/kapa switch'i tarafından çağrılır: kapatınca sunucudaki
-  /// fcm_token'ı boşaltır (bu üyeye artık bildirim gönderilmez), açınca
-  /// güncel token'ı yeniden kaydeder.
+  /// Bildirim aç/kapa switch'i tarafından çağrılır: kapatınca bu cihazın
+  /// sunucudaki kaydı silinir (kişinin diğer cihazları etkilenmez), açınca
+  /// güncel token yeniden kaydedilir.
   static Future<void> setEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notificationsEnabled', enabled);
     await syncToken();
   }
 
-  /// Seçili üyenin sunucudaki cihaz token'ını bildirim ayarına göre günceller.
-  /// "Ben Kimim?" profili değişince de çağrılır.
-  static Future<bool> syncToken() async {
-    if (!await _isEnabled()) {
-      return _registerToken('');
+  /// Bu cihazın FCM token'ı; Firebase başlatılamadıysa (ör. Google Play
+  /// servisleri yok) null.
+  static Future<String?> deviceToken() async {
+    try {
+      return await FirebaseMessaging.instance.getToken();
+    } catch (e) {
+      debugPrint("FCM token alınamadı: $e");
+      return null;
     }
-    final token = await FirebaseMessaging.instance.getToken();
-    return token != null && await _registerToken(token);
   }
 
-  static Future<bool> _registerToken(String token) async {
+  /// Bu cihazın sunucudaki kaydını bildirim ayarına göre günceller. "Ben Kimim?"
+  /// profili değişince de çağrılır: sunucu cihazı yeni üyeye taşır.
+  static Future<bool> syncToken() async {
+    final token = await deviceToken();
+    if (token == null) return false;
+    return _registerToken(token, enabled: await _isEnabled());
+  }
+
+  static Future<bool> _registerToken(String token, {bool enabled = true}) async {
     final prefs = await SharedPreferences.getInstance();
     final memberId = prefs.getInt('saved_member_id');
     if (memberId == null) return false;
 
-    final ok = await ApiService.updateMemberToken(memberId, token);
+    final ok = await ApiService.updateMemberToken(memberId, token, enabled: enabled);
     if (!ok) debugPrint("FCM token kaydı başarısız");
     return ok;
   }

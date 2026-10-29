@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'notification_service.dart';
 import 'session.dart';
 
 // ==========================================
@@ -195,8 +196,10 @@ class ApiService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final memberId = prefs.getInt('saved_member_id');
-      if (memberId != null) {
-        await updateMemberToken(memberId, '');
+      // Sadece bu cihaz silinir; kişinin diğer cihazlarına bildirim gelmeye devam eder
+      final fcmToken = await NotificationService.deviceToken();
+      if (memberId != null && fcmToken != null) {
+        await updateMemberToken(memberId, fcmToken, enabled: false);
       }
       // Ortak (eski sürümden kalma) token sunucuda iptal edilmez: aynı evdeki
       // diğer cihazlar hâlâ onu kullanıyor olabilir.
@@ -266,11 +269,13 @@ class ApiService {
 
   static Future<bool> deleteFamilyMember(int id) => _postForSuccess("delete_member.php", {"id": id.toString()});
 
-  /// Boş token: bu üyeye bildirim gönderilmesin.
-  static Future<bool> updateMemberToken(int memberId, String fcmToken) =>
+  /// Bu cihazın bildirim token'ını üyeye bağlar. [enabled] false ise sadece bu
+  /// cihazın kaydı silinir (bildirim kapatıldı ya da çıkış yapıldı).
+  static Future<bool> updateMemberToken(int memberId, String fcmToken, {bool enabled = true}) =>
       _postForSuccess("update_member_token.php", {
         "member_id": memberId.toString(),
         "fcm_token": fcmToken,
+        if (!enabled) "enabled": "0",
       });
 
   // ---------- Ev bilgileri / envanter ----------
@@ -291,9 +296,9 @@ class ApiService {
 
   // ---------- Anket ----------
 
-  // include_closed: biten anket de sonuçlarıyla gelir (is_open: false)
-  static Future<Map<String, dynamic>> getActivePoll(int houseId, int memberId) =>
-      _getMap("get_active_poll.php", {"member_id": memberId.toString(), "include_closed": "1"});
+  // Evin bütün anketleri: açıklar ve son 24 saatte bitenler (sonuçlarıyla). Bkz. PollsData.
+  static Future<Map<String, dynamic>> getPolls(int memberId) =>
+      _getMap("get_polls.php", {"member_id": memberId.toString()});
 
   static Future<bool> votePoll(int pollId, int optionId, int houseId, int memberId) =>
       _postForSuccess("vote_poll.php", {
@@ -302,25 +307,31 @@ class ApiService {
         "member_id": memberId.toString(),
       });
 
-  // memberId: anketi açan kişi (ona bildirim gitmez); profil seçilmediyse null
-  static Future<bool> createPoll(int houseId, String question, List<String> options,
+  // memberId: anketi açan kişi (ona bildirim gitmez); profil seçilmediyse null.
+  // Hata olursa "message" ekranda gösterilir (ör. açık anket sınırı).
+  static Future<Map<String, dynamic>> createPoll(String question, List<String> options,
       {int durationHours = 24, int? memberId}) async {
     try {
-      return _isSuccess(await _postJson("create_poll.php", {
+      final data = _decodeMap(await _postJson("create_poll.php", {
         "question": question,
         "options": options,
         "duration_hours": durationHours,
         if (memberId != null) "member_id": memberId,
       }));
+      return data.isNotEmpty ? data : {"status": "error", "message": "Sunucu hatası"};
     } catch (e) {
       debugPrint("create_poll.php hatası: $e");
-      return false;
+      return _connectionError();
     }
   }
 
   // Açanı belli olan anketi sadece açan kişi bitirebilir (memberId: "Ben kimim?", seçilmediyse 0)
   static Future<bool> endPoll(int pollId, int memberId) =>
       _postForSuccess("end_poll.php", {"poll_id": pollId.toString(), "member_id": memberId.toString()});
+
+  // Silme yetkisi bitirmeyle aynı (açan kişi; açanı belli değilse herkes)
+  static Future<bool> deletePoll(int pollId, int memberId) =>
+      _postForSuccess("delete_poll.php", {"poll_id": pollId.toString(), "member_id": memberId.toString()});
 }
 
 // ==========================================

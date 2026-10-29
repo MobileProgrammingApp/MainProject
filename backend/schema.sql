@@ -8,8 +8,7 @@ CREATE TABLE `home_members` (
   `id` int NOT NULL,
   `house_id` int NOT NULL,
   `name` varchar(100) COLLATE utf8mb4_general_ci NOT NULL,
-  `role` varchar(50) COLLATE utf8mb4_general_ci DEFAULT 'member',
-  `fcm_token` text COLLATE utf8mb4_general_ci
+  `role` varchar(50) COLLATE utf8mb4_general_ci DEFAULT 'member'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `house_chores` (
@@ -47,7 +46,8 @@ CREATE TABLE `polls` (
   `question` varchar(255) COLLATE utf8mb4_general_ci NOT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   `ends_at` datetime DEFAULT NULL,
-  `created_by` int DEFAULT NULL
+  `created_by` int DEFAULT NULL,
+  `end_notified` tinyint(1) NOT NULL DEFAULT '0'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `poll_options` (
@@ -185,4 +185,17 @@ CREATE TABLE `auth_attempts` (
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `lookup` (`action`, `subject`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Üyelerin bildirim alan cihazları (FCM token'ı) — bkz. migrations/2026-10-29_polls_and_devices.sql.
+-- Bir üyenin birden fazla cihazı olabilir; token benzersiz olduğu için bir cihaz tek üyeye bağlıdır.
+CREATE TABLE `member_devices` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `member_id` int NOT NULL,
+  `fcm_token` varchar(1024) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `fcm_token` (`fcm_token`),
+  KEY `member_id` (`member_id`),
+  CONSTRAINT `member_devices_ibfk_1` FOREIGN KEY (`member_id`) REFERENCES `home_members` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

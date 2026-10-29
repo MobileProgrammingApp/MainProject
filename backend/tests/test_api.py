@@ -47,6 +47,14 @@ def req(path, data=None, get=None, token=None, json_body=None, raw=False):
 def sql(q):
     return subprocess.run(MYSQL + [q], capture_output=True, text=True).stdout.strip()
 
+def devices(member_id):
+    return sql(f"SELECT IFNULL(GROUP_CONCAT(fcm_token ORDER BY fcm_token), '-') FROM member_devices WHERE member_id = {member_id}")
+
+def fcm_log():
+    # fcm_helper.php testte bildirim göndermez, alıcıları buraya yazar
+    path = os.environ["HOMEPAL_TEST_FCM"]
+    return [json.loads(l) for l in open(path, encoding="utf-8")] if os.path.exists(path) else []
+
 def last_mail_link(to, kind):
     lines = [json.loads(l) for l in open(MAILS, encoding="utf-8")] if os.path.exists(MAILS) else []
     for m in reversed(lines):
@@ -208,14 +216,22 @@ check("aynı seçeneğe ikinci oy hata vermiyor", j.get("status") == "success", 
 c, j = req("get_active_poll.php", get={"api_token": OLD_TOKEN, "member_id": "1"})
 check("ikinci oy sayılmadı (sayaç 1'de kaldı)", int(j["options"][0]["vote_count"]) == 1, j)
 
-print("9) Bildirim token'ı")
-c, j = req("update_member_token.php", data={"member_id": "1", "fcm_token": "tokA"}, token=OLD_TOKEN)
-check("token kaydedildi", j.get("status") == "success", j)
-check("aynı cihaz token'ı diğer üyeden temizlendi", sql("SELECT fcm_token IS NULL FROM home_members WHERE id = 2") == "1")
+print("9) Bildirim token'ı (cihaz başına)")
+c, j = req("update_member_token.php", data={"member_id": "1", "fcm_token": "tokB"}, token=OLD_TOKEN)
+check("aynı kişinin ikinci cihazı eklendi, ilki duruyor", j.get("status") == "success" and devices(1) == "tokA,tokB", (j, devices(1)))
+c, j = req("update_member_token.php", data={"member_id": "1", "fcm_token": "tokB"}, token=OLD_TOKEN)
+check("aynı token'ı tekrar kaydetmek çift kayıt açmıyor", j.get("status") == "success" and devices(1) == "tokA,tokB", devices(1))
+req("update_member_token.php", data={"member_id": "2", "fcm_token": "tokA"}, token=OLD_TOKEN)
+check("profil değişince cihaz yeni üyeye taşındı", devices(1) == "tokB" and devices(2) == "tokA", (devices(1), devices(2)))
 c, j = req("get_members.php", token=OLD_TOKEN)
 check("üye listesinde fcm_token dönmüyor", isinstance(j, list) and j and "fcm_token" not in j[0], j)
-c, j = req("update_member_token.php", data={"member_id": "1", "fcm_token": ""}, token=OLD_TOKEN)
-check("bildirim kapatma: token NULL", sql("SELECT fcm_token IS NULL FROM home_members WHERE id = 1") == "1")
+c, j = req("update_member_token.php", data={"member_id": "1", "fcm_token": "tokB", "enabled": "0"}, token=OLD_TOKEN)
+check("bildirimi kapatan cihaz silindi, diğer üyeninki duruyor", j.get("status") == "success" and devices(1) == "-" and devices(2) == "tokA", (j, devices(2)))
+c, j = req("update_member_token.php", data={"member_id": "2", "fcm_token": ""}, token=OLD_TOKEN)
+check("eski sürümün boş token'ı üyenin cihazlarını siliyor", j.get("status") == "success" and devices(2) == "-", devices(2))
+for bad in ("şifre", "x" * 1025, "a b"):
+    c, j = req("update_member_token.php", data={"member_id": "1", "fcm_token": bad}, token=OLD_TOKEN)
+    check(f"geçersiz token reddedildi ({bad[:8]})", j.get("message") == "Geçersiz token", j)
 
 print("10) Çıkış")
 c, j = req("logout.php", token=tokC)
@@ -254,6 +270,7 @@ check("kayıtlı/kayıtsız ayırt edilemiyor (aynı cevap)", j1 == j2, (j1, j2)
 sql("DELETE FROM auth_attempts")
 
 print("13) Anket: profil seçilmeden görüntüleme ve 24 saatlik süre")
+sql("DELETE FROM polls")  # 8. bölümün anketi açık kalıyor (yeni anket eskisini artık silmiyor)
 req("create_poll.php", json_body={"api_token": OLD_TOKEN, "question": "Hafta sonu?", "options": ["Sinema", "Piknik"]})
 c, j = req("get_active_poll.php", get={"api_token": OLD_TOKEN, "member_id": "0"})
 check("profil seçmeden anket görünüyor", j.get("question") == "Hafta sonu?" and j.get("has_voted") is False, j)
@@ -400,16 +417,23 @@ for bad in (0, 169, "abc"):
 c, j = req("create_poll.php", json_body={"question": "Film?", "options": ["A", "B"], "member_id": 3}, token=OLD_TOKEN)
 check("başka evin üyesi anket açan olarak verilemiyor", j.get("message") == "Geçersiz üye", j)
 c, j = req("create_poll.php", json_body={"question": "Film?", "options": ["Komedi", "Korku", "Dram"], "duration_hours": 1, "member_id": 1}, token=OLD_TOKEN)
-check("1 saatlik anket açıldı, eskisinin yerine geçti", j.get("status") == "success" and sql("SELECT COUNT(*) FROM polls WHERE house_id = 1") == "1", j)
+check("1 saatlik anket açıldı, eski anket de yerinde", j.get("status") == "success" and sql("SELECT COUNT(*) FROM polls WHERE house_id = 1") == "2", j)
+pid = j.get("poll_id")
+check("yeni anketin numarası dönüyor", isinstance(pid, int), j)
+c, j = req("get_active_poll.php", get={"member_id": "2", "include_closed": "1"}, token=OLD_TOKEN)
+check("eski sürüme en son açılan açık anket gidiyor", str(j.get("poll_id")) == str(pid), j)
+sql("DELETE FROM polls WHERE question = 'Eski anket'")
 c, j = req("get_active_poll.php", get={"member_id": "2", "include_closed": "1"}, token=OLD_TOKEN)
 members = int(sql("SELECT COUNT(*) FROM home_members WHERE house_id = 1"))
 check("açık, ~1 saat kaldı; açan kişi ve üye sayısı dönüyor",
       j.get("is_open") is True and 59 <= j.get("minutes_left", 0) <= 60 and j.get("created_by") == 1
       and j.get("created_by_name") == "Ahmet" and j.get("member_count") == members, j)
-pid, opts = j["poll_id"], [o["id"] for o in j["options"]]
-def poll_counts(extra=None):
-    c, j = req("get_active_poll.php", get={"member_id": "2", "include_closed": "1", **(extra or {})}, token=OLD_TOKEN)
-    return j, [int(o["vote_count"]) for o in j.get("options", [])]
+opts = [o["id"] for o in j["options"]]
+def poll_counts(poll=None):
+    # 1.3.0'ın gördüğü hâli (get_polls.php); anket listede yoksa {}
+    c, j = req("get_polls.php", get={"member_id": "2"}, token=OLD_TOKEN)
+    p = next((p for p in j.get("polls", []) if str(p["poll_id"]) == str(poll or pid)), {})
+    return p, [int(o["vote_count"]) for o in p.get("options", [])]
 
 req("vote_poll.php", data={"poll_id": pid, "option_id": opts[0], "member_id": "1"}, token=OLD_TOKEN)
 req("vote_poll.php", data={"poll_id": pid, "option_id": opts[0], "member_id": "2"}, token=OLD_TOKEN)
@@ -425,9 +449,9 @@ check("açan kişi dışındaki üye bitiremiyor", j.get("message") == "Anketi s
 c, j = req("end_poll.php", data={"poll_id": pid}, token=OLD_TOKEN)
 check("üye seçilmeden bitirilemiyor", j.get("message") == "Anketi sadece açan kişi bitirebilir", j)
 c, j = req("create_poll.php", json_body={"question": "Baska?", "options": ["X", "Y"], "member_id": 2}, token=OLD_TOKEN)
-check("başka üye yeni anketle açık anketi silemiyor", j.get("message") == "Açık anketi sadece açan kişi değiştirebilir", j)
+check("başka üye de anket açabiliyor, açık anket yerinde", j.get("status") == "success" and poll_counts()[0].get("is_open") is True, j)
 c, j = req("create_poll.php", json_body={"api_token": OLD_TOKEN, "question": "Baska?", "options": ["X", "Y"]})
-check("eski sürüm de açık anketi silemiyor", j.get("status") == "error" and poll_counts()[0].get("poll_id") == pid, j)
+check("eski sürümün açtığı anket de açık anketi silmiyor", j.get("status") == "success" and poll_counts()[0].get("is_open") is True, j)
 c, j = req("end_poll.php", data={"poll_id": pid, "member_id": "1"}, token=OLD_TOKEN)
 check("açan kişi erken bitirdi", j.get("status") == "success", j)
 c, j = req("end_poll.php", data={"poll_id": pid, "member_id": "2"}, token=OLD_TOKEN)
@@ -436,25 +460,141 @@ c, j = req("vote_poll.php", data={"poll_id": pid, "option_id": opts[2], "member_
 check("biten ankete oy verilemiyor", j.get("message") == "Anket sona erdi", j)
 j2, counts = poll_counts()
 check("biten anket sonuçlarıyla görünüyor (1.3.0+)", j2.get("is_open") is False and j2.get("minutes_left") == 0 and counts == [1, 1, 0], j2)
+check("biten anketin silinmesine ~24 saat var", 1435 <= j2.get("result_minutes_left", 0) <= 1440, j2.get("result_minutes_left"))
 c, j = req("get_active_poll.php", get={"member_id": "1"}, token=OLD_TOKEN)
-check("eski sürüme biten anket gösterilmiyor", j.get("status") == "empty", j)
+check("eski sürüme biten anket gösterilmiyor", j.get("status") == "success" and str(j.get("poll_id")) != str(pid), j)
 
 sql(f"UPDATE polls SET ends_at = NOW() - INTERVAL 25 HOUR WHERE id = {pid}")
-check("bitişinden 24 saat sonra sonuç da kalkıyor", poll_counts()[0].get("status") == "empty")
+check("bitişinden 24 saat sonra sonuç da kalkıyor", poll_counts()[0] == {})
 req("create_poll.php", json_body={"question": "Kalsin mi?", "options": ["Evet", "Hayir"]}, token=tokE)
 out = run_cron()
 check("cron eski sonucu sildi, açık ankete dokunmadı",
       "Silinen anket sayısı: 1" in out and sql(f"SELECT COUNT(*) FROM polls WHERE id = {pid}") == "0"
       and sql("SELECT COUNT(*) FROM polls WHERE question = 'Kalsin mi?'") == "1", out)
 c, j = req("create_poll.php", json_body={"api_token": OLD_TOKEN, "question": "Sahipsiz", "options": ["X", "Y"]})
-check("açanı belli olmayan (eski sürüm) anketin yerine yenisi açılabiliyor", j.get("status") == "success", j)
-pid = poll_counts()[0].get("poll_id")
+pid = j.get("poll_id")
 c, j = req("end_poll.php", data={"poll_id": pid}, token=OLD_TOKEN)
-check("açanı belli olmayan anketi herkes bitirebiliyor", j.get("status") == "success" and poll_counts()[0].get("is_open") is False, j)
-c, j = req("create_poll.php", json_body={"question": "Yeni", "options": ["X", "Y"], "member_id": 2}, token=OLD_TOKEN)
-check("biten anketin yerine herkes yenisini açabiliyor", j.get("status") == "success", j)
+check("açanı belli olmayan (eski sürüm) anketi herkes bitirebiliyor", j.get("status") == "success" and poll_counts()[0].get("is_open") is False, j)
 
-print("18) PHP hata logu")
+print("18) Birden fazla anket, silme, bitiş bildirimi ve çoklu cihaz")
+# Önce migration: eski biçimde (üyede tek fcm_token, end_notified yok) iki kez
+sql("DELETE FROM polls"); sql("DELETE FROM member_devices")
+sql("ALTER TABLE polls DROP COLUMN end_notified")
+sql("ALTER TABLE home_members ADD COLUMN fcm_token text")
+sql("UPDATE home_members SET fcm_token = CASE id WHEN 1 THEN 'eskiTok1' WHEN 2 THEN 'eskiTok2' END WHERE id IN (1, 2)")
+sql("INSERT INTO polls (house_id, question, ends_at) VALUES (1, 'Bitmis', NOW() - INTERVAL 1 HOUR), (1, 'Acik', NOW() + INTERVAL 1 HOUR)")
+migration = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "migrations", "2026-10-29_polls_and_devices.sql")
+def run_migration():
+    with open(migration, "rb") as f:
+        return subprocess.run(MYSQL[:-2], stdin=f, capture_output=True)
+r = run_migration()
+check("migration ilk çalıştırmada hatasız", r.returncode == 0, r.stderr)
+check("üyelerdeki token'lar cihaz tablosuna taşındı", devices(1) == "eskiTok1" and devices(2) == "eskiTok2", (devices(1), devices(2)))
+check("üyedeki eski token kolonu kaldırıldı", sql(
+    "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'homepal_test' AND table_name = 'home_members' AND column_name = 'fcm_token'") == "0")
+check("bu sürümden önce açılmış anketler (açık olan da) bitiş bildirimi göndermeyecek",
+      sql("SELECT GROUP_CONCAT(CONCAT(question, '=', end_notified) ORDER BY question) FROM polls") == "Acik=1,Bitmis=1")
+sql("INSERT INTO polls (house_id, question, ends_at) VALUES (1, 'Sonradan', NOW() + INTERVAL 1 HOUR)")
+r = run_migration()
+check("migration ikinci çalıştırmada hatasız, sonradan açılan anketin bildirimi duruyor",
+      r.returncode == 0 and sql("SELECT end_notified FROM polls WHERE question = 'Sonradan'") == "0", r.stderr)
+sql("DELETE FROM polls"); sql("DELETE FROM member_devices")
+
+# Ahmet (1) telefon + tablet, Ayse (2) telefon
+for m, t in (("1", "phoneA"), ("1", "tabletA"), ("2", "phoneB")):
+    req("update_member_token.php", data={"member_id": m, "fcm_token": t}, token=OLD_TOKEN)
+n = len(fcm_log())
+c, j = req("create_poll.php", json_body={"question": "Pizza?", "options": ["Evet", "Hayir"], "member_id": 2}, token=OLD_TOKEN)
+p1 = j.get("poll_id")
+c, j = req("create_poll.php", json_body={"question": "Film?", "options": ["Evet", "Hayir"], "member_id": 1, "duration_hours": 1}, token=OLD_TOKEN)
+p2 = j.get("poll_id")
+sent = fcm_log()[n:]
+check("yeni anket bildirimi açanın hiçbir cihazına gitmiyor, diğer kişinin bütün cihazlarına gidiyor",
+      len(sent) == 2 and sorted(sent[0]["tokens"]) == ["phoneA", "tabletA"] and sent[1]["tokens"] == ["phoneB"], sent)
+c, j = req("get_polls.php", get={"member_id": "1"}, token=OLD_TOKEN)
+check("iki anket birlikte açık, en yakında kapanan başta",
+      [str(p["poll_id"]) for p in j.get("polls", [])] == [str(p2), str(p1)] and j.get("member_count") == int(sql("SELECT COUNT(*) FROM home_members WHERE house_id = 1")), j)
+c, j = req("get_polls.php", get={"member_id": "3"}, token=OLD_TOKEN)
+check("get_polls: başka evin üyesi reddedildi", j.get("message") == "Geçersiz üye", j)
+c, j = req("get_polls.php", token=tokE)
+check("başka ev bu anketleri görmüyor", all(p["question"] not in ("Pizza?", "Film?") for p in j.get("polls", [])), j)
+
+c, j = req("get_polls.php", get={"member_id": "1"}, token=OLD_TOKEN)
+film = next(p for p in j["polls"] if str(p["poll_id"]) == str(p2))
+for m in ("1", "2"):
+    req("vote_poll.php", data={"poll_id": p2, "option_id": film["options"][0]["id"], "member_id": m}, token=OLD_TOKEN)
+n = len(fcm_log())
+req("end_poll.php", data={"poll_id": p2, "member_id": "1"}, token=OLD_TOKEN)
+sent = fcm_log()[n:]
+check("erken bitirince sonuç bildirimi bitirenin cihazlarına gitmiyor",
+      len(sent) == 1 and sent[0]["tokens"] == ["phoneB"] and sent[0]["title"] == "Anket sona erdi"
+      and sent[0]["body"] == "Film? • Kazanan: Evet (2 oy)" and sent[0]["screen"] == "home", sent)
+n = len(fcm_log()); run_cron()
+check("cron aynı anket için ikinci bildirim göndermiyor", fcm_log()[n:] == [], fcm_log()[n:])
+
+sql(f"UPDATE polls SET ends_at = NOW() - INTERVAL 1 MINUTE WHERE id = {p1}")
+n = len(fcm_log()); out = run_cron(); sent = fcm_log()[n:]
+check("süresi dolan anketin sonucu cron'la herkesin cihazlarına gitti",
+      len(sent) == 1 and sorted(sent[0]["tokens"]) == ["phoneA", "phoneB", "tabletA"]
+      and sent[0]["body"] == "Pizza? • Kimse oy vermedi" and "Bitiş bildirimi giden anket: 1" in out, (sent, out))
+check("sonraki cron tekrar göndermiyor", "Bitiş bildirimi giden anket: 0" in run_cron())
+
+c, j = req("create_poll.php", json_body={"question": "Renk?", "options": ["Mavi", "Yesil", "Sari"], "member_id": 1}, token=OLD_TOKEN)
+p3 = j.get("poll_id")
+c, j = req("get_polls.php", get={"member_id": "1"}, token=OLD_TOKEN)
+renk = next(p for p in j["polls"] if str(p["poll_id"]) == str(p3))
+req("vote_poll.php", data={"poll_id": p3, "option_id": renk["options"][0]["id"], "member_id": "1"}, token=OLD_TOKEN)
+req("vote_poll.php", data={"poll_id": p3, "option_id": renk["options"][1]["id"], "member_id": "2"}, token=OLD_TOKEN)
+n = len(fcm_log())
+req("end_poll.php", data={"poll_id": p3, "member_id": "1"}, token=OLD_TOKEN)
+sent = fcm_log()[n:]
+check("beraberlik bildirimde yazıyor", sent and sent[0]["body"] == "Renk? • Berabere: Mavi, Yesil", sent)
+
+c, j = req("delete_poll.php", data={"poll_id": p1, "member_id": "1"}, token=OLD_TOKEN)
+check("biten anketi açan dışındaki üye silemiyor", j.get("message") == "Anketi sadece açan kişi silebilir", j)
+c, j = req("delete_poll.php", data={"poll_id": p1}, token=OLD_TOKEN)
+check("üye seçilmeden silinemiyor", j.get("message") == "Anketi sadece açan kişi silebilir", j)
+c, j = req("delete_poll.php", data={"poll_id": p2, "member_id": own_member}, token=tokE)
+check("başka evin anketi silinemiyor", j.get("message") == "Anket bulunamadı" and poll_counts(p2)[0] != {}, j)
+c, j = req("delete_poll.php", data={"poll_id": p2, "member_id": "1"}, token=OLD_TOKEN)
+check("açan kişi biten anketi sildi; seçenek ve oyları da gitti",
+      j.get("status") == "success" and poll_counts(p2)[0] == {}
+      and sql(f"SELECT (SELECT COUNT(*) FROM poll_options WHERE poll_id = {p2}) + (SELECT COUNT(*) FROM poll_votes WHERE poll_id = {p2})") == "0", j)
+c, j = req("create_poll.php", json_body={"question": "Acik sil", "options": ["X", "Y"], "member_id": 2}, token=OLD_TOKEN)
+c, j = req("delete_poll.php", data={"poll_id": j.get("poll_id"), "member_id": "2"}, token=OLD_TOKEN)
+check("açık anket de silinebiliyor", j.get("status") == "success" and sql("SELECT COUNT(*) FROM polls WHERE question = 'Acik sil'") == "0", j)
+c, j = req("create_poll.php", json_body={"api_token": OLD_TOKEN, "question": "Sahipsiz", "options": ["X", "Y"]})
+c, j = req("delete_poll.php", data={"poll_id": j.get("poll_id")}, token=OLD_TOKEN)
+check("açanı belli olmayan anketi herkes silebiliyor", j.get("status") == "success", j)
+
+sql("DELETE FROM polls")
+for i in range(10):
+    req("create_poll.php", json_body={"question": f"Soru {i}", "options": ["X", "Y"]}, token=OLD_TOKEN)
+c, j = req("create_poll.php", json_body={"question": "Fazla", "options": ["X", "Y"]}, token=OLD_TOKEN)
+check("aynı anda en fazla 10 açık anket", j.get("message") == "Aynı anda en fazla 10 anket açık olabilir", j)
+sql("UPDATE polls SET ends_at = NOW() - INTERVAL 1 MINUTE, end_notified = 1 WHERE question = 'Soru 0'")
+c, j = req("create_poll.php", json_body={"question": "Fazla", "options": ["X", "Y"]}, token=OLD_TOKEN)
+check("biri bitince yenisi açılabiliyor", j.get("status") == "success", j)
+sql("DELETE FROM polls")
+
+req("update_member_token.php", data={"member_id": own_member, "fcm_token": "tabletA"}, token=tokE)
+check("cihaz başka eve giriş yapınca eski evdeki kaydı taşındı", devices(1) == "phoneA" and devices(own_member) == "tabletA", (devices(1), devices(own_member)))
+req("update_member_token.php", data={"member_id": "1", "fcm_token": "tabletA", "enabled": "0"}, token=OLD_TOKEN)
+check("başka evin cihazı kapatılamıyor", devices(own_member) == "tabletA", devices(own_member))
+req("add_member.php", data={"name": "Cem"}, token=OLD_TOKEN)
+cem = sql("SELECT id FROM home_members WHERE house_id = 1 ORDER BY id DESC LIMIT 1")
+req("update_member_token.php", data={"member_id": cem, "fcm_token": "phoneC"}, token=OLD_TOKEN)
+req("delete_member.php", data={"id": cem}, token=OLD_TOKEN)
+check("üye silinince cihaz kaydı da silindi", sql("SELECT COUNT(*) FROM member_devices WHERE fcm_token = 'phoneC'") == "0")
+n = len(fcm_log())
+req("add_chore.php", data={"assigned_to_id": "1", "task_name": "Cihaz testi"}, token=OLD_TOKEN)
+check("görev bildirimi kişinin cihazına gidiyor", fcm_log()[n:] and fcm_log()[n:][0]["tokens"] == ["phoneA"], fcm_log()[n:])
+sql("DELETE FROM house_chores WHERE task_name = 'Cihaz testi'")
+sql("UPDATE member_devices SET updated_at = NOW() - INTERVAL 271 DAY WHERE fcm_token = 'phoneA'")
+out = run_cron()
+check("270 gündür açılmayan cihaz kaydı temizlendi", devices(1) == "-" and devices(2) == "phoneB" and "Silinen eski cihaz kaydı: 1" in out, (devices(1), out))
+
+print("19) PHP hata logu")
 errs = open(PHP_ERRORS, encoding="utf-8", errors="replace").read() if os.path.exists(PHP_ERRORS) else ""
 bad = [l for l in errs.splitlines() if re.search(r"PHP (Warning|Fatal|Notice|Deprecated)", l)]
 check("PHP uyarı/hata logu temiz", not bad, "\n" + "\n".join(bad[:8]))
