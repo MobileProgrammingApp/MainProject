@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../features/auth/login_screen.dart';
+import 'app_theme.dart';
 
 /// Oturum token'ının tek erişim noktası.
 ///
@@ -65,11 +66,14 @@ class Session {
   }
 
   /// Token'ı ve cihazdaki tüm oturum verilerini (ev, seçili üye vb.) siler.
+  /// Tema seçimi oturuma değil cihaza ait olduğu için korunur.
   static Future<void> clear() async {
     _cachedToken = null;
     await _storage.deleteAll();
     final prefs = await SharedPreferences.getInstance();
+    final themeMode = prefs.getString(AppTheme.modeKey);
     await prefs.clear();
+    if (themeMode != null) await prefs.setString(AppTheme.modeKey, themeMode);
   }
 
   /// Sunucu token'ı reddetti (şifre değişti/sıfırlandı, oturum kapatıldı).

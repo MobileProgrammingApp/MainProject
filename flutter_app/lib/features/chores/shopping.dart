@@ -191,12 +191,12 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                     child: _items.isEmpty && ApiService.offline.value
                         ? const EmptyState.offline()
                         : _items.isEmpty
-                        ? const EmptyState(
+                        ? EmptyState(
                             icon: Icons.shopping_basket_outlined,
                             title: "Liste boş",
                             message: "Eksik bir şey olduğunda yukarıdan ekle,\nevdeki herkes görsün.",
                             color: AppStyles.accentColor,
-                            softColor: AppStyles.accentSoft,
+                            softColor: context.styles.accentSoft,
                           )
                         : ListView(
                             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -216,7 +216,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
                                     onPressed: _clearBought,
                                     icon: const Icon(Icons.delete_sweep_outlined, size: 18),
                                     label: const Text("Temizle"),
-                                    style: TextButton.styleFrom(foregroundColor: AppStyles.mutedTextColor),
+                                    style: TextButton.styleFrom(foregroundColor: context.styles.mutedTextColor),
                                   ),
                                 ),
                                 GroupedCard(dividerIndent: 56, children: done.map(_buildItemRow).toList()),
@@ -275,7 +275,7 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        color: AppStyles.deleteColor,
+        color: context.styles.deleteColor,
         child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
       ),
       onDismissed: (_) => _delete(item),
@@ -293,13 +293,13 @@ class _ShoppingScreenState extends State<ShoppingScreen> {
             fontSize: 16,
             fontWeight: item.done ? FontWeight.w400 : FontWeight.w600,
             decoration: item.done ? TextDecoration.lineThrough : null,
-            color: item.done ? AppStyles.mutedTextColor : AppStyles.textColor,
+            color: item.done ? context.styles.mutedTextColor : context.styles.textColor,
           ),
         ),
         subtitle: item.addedBy == null ? null : Text("Ekleyen: ${item.addedBy}"),
         trailing: IconButton(
           tooltip: "Sil",
-          icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
+          icon: Icon(Icons.close_rounded, size: 20, color: context.styles.mutedTextColor),
           onPressed: () => _delete(item),
         ),
       ),
@@ -352,7 +352,7 @@ class _RenameItemSheetState extends State<_RenameItemSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text("Ürünü düzenle", style: AppStyles.popupHeader),
+          Text("Ürünü düzenle", style: context.styles.popupHeader),
           const SizedBox(height: 16),
           TextField(
             controller: _controller,

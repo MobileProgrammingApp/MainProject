@@ -72,18 +72,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           width: 42,
                           height: 42,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEDEFF3),
+                            color: context.styles.neutralSoft,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.cloud_off_rounded,
-                            color: AppStyles.mutedTextColor,
+                            color: context.styles.mutedTextColor,
                             size: 22,
                           ),
                         ),
-                        title: const Text(
+                        title: Text(
                           "Hesap bilgileri alınamadı",
-                          style: AppStyles.listTileTitle,
+                          style: context.styles.listTileTitle,
                         ),
                         subtitle: const Text(
                           "İnternet bağlantını kontrol edip aşağı çekerek yenile.",
@@ -97,16 +97,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: ListTile(
                       contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
                       leading: _badge(Icons.lock_outline_rounded),
-                      title: const Text(
+                      title: Text(
                         'Şifre değiştir',
-                        style: AppStyles.listTileTitle,
+                        style: context.styles.listTileTitle,
                       ),
                       subtitle: const Text(
                         "Diğer cihazlarda yeniden giriş gerekir",
                       ),
-                      trailing: const Icon(
+                      trailing: Icon(
                         Icons.chevron_right_rounded,
-                        color: AppStyles.mutedTextColor,
+                        color: context.styles.mutedTextColor,
                       ),
                       onTap: _showChangePasswordSheet,
                     ),
@@ -120,21 +120,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         width: 42,
                         height: 42,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFBE6E6),
+                          color: context.styles.deleteSoft,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.delete_forever_outlined,
-                          color: AppStyles.deleteColor,
+                          color: context.styles.deleteColor,
                           size: 22,
                         ),
                       ),
-                      title: const Text(
+                      title: Text(
                         'Hesabı sil',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: AppStyles.deleteColor,
+                          color: context.styles.deleteColor,
                         ),
                       ),
                       subtitle: const Text(
@@ -160,10 +160,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       width: 42,
       height: 42,
       decoration: BoxDecoration(
-        color: AppStyles.primarySoft,
+        color: context.styles.primarySoft,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(icon, color: AppStyles.primaryColor, size: 22),
+      child: Icon(icon, color: context.styles.primaryColor, size: 22),
     );
   }
 
@@ -171,8 +171,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return ListTile(
       contentPadding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
       leading: _badge(icon),
-      title: Text(label, style: AppStyles.listTileSubtitle),
-      subtitle: Text(value, style: AppStyles.listTileTitle),
+      title: Text(label, style: context.styles.listTileSubtitle),
+      subtitle: Text(value, style: context.styles.listTileTitle),
     );
   }
 
@@ -270,8 +270,8 @@ class _ChangePasswordSheetState extends State<_ChangePasswordSheet> {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text('Şifre değiştir', style: AppStyles.popupHeader),
+              Expanded(
+                child: Text('Şifre değiştir', style: context.styles.popupHeader),
               ),
               IconButton(
                 tooltip: _obscure ? "Şifreleri göster" : "Şifreleri gizle",
@@ -379,19 +379,19 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Hesabı sil', style: AppStyles.popupHeader),
+          Text('Hesabı sil', style: context.styles.popupHeader),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFFBE6E6),
+              color: context.styles.deleteSoft,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
               "${widget.houseName.isEmpty ? "Bu ev hesabı" : "\"${widget.houseName}\" ev hesabı"}; ev üyeleri, görevler, market listesi, ev bilgileri ve "
               "anketlerle birlikte kalıcı olarak silinir. Bu hesabı kullanan bütün aile üyeleri "
               "oturumdan çıkar. Bu işlem geri alınamaz.",
-              style: const TextStyle(color: AppStyles.textColor),
+              style: TextStyle(color: context.styles.textColor),
             ),
           ),
           const SizedBox(height: 16),
@@ -408,7 +408,7 @@ class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
           FilledButton(
             onPressed: _deleting ? null : _delete,
             style: FilledButton.styleFrom(
-              backgroundColor: AppStyles.deleteColor,
+              backgroundColor: context.styles.deleteColor,
             ),
             child: _deleting
                 ? const SizedBox(

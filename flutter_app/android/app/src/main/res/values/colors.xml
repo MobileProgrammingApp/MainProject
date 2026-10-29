@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Uygulamanın arka plan rengiyle aynı (AppStyles.backgroundColor) -->
+    <!-- Uygulamanın arka plan rengiyle aynı (AppStyles.light.backgroundColor) -->
     <color name="splash_background">#F5F7FB</color>
 	<color name="ic_launcher_background">#0D3154</color>
 </resources>

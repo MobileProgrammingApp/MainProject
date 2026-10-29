@@ -200,7 +200,7 @@ class _ChoresScreenState extends State<ChoresScreen> {
                                     onPressed: _clearDone,
                                     icon: const Icon(Icons.delete_sweep_outlined, size: 18),
                                     label: const Text("Temizle"),
-                                    style: TextButton.styleFrom(foregroundColor: AppStyles.mutedTextColor),
+                                    style: TextButton.styleFrom(foregroundColor: context.styles.mutedTextColor),
                                   ),
                           ),
                           GroupedCard(dividerIndent: 72, children: done.map(_buildDoneRow).toList()),
@@ -215,12 +215,12 @@ class _ChoresScreenState extends State<ChoresScreen> {
   Widget _buildAllDoneCard() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: AppStyles.cardDecoration,
-      child: const Row(
+      decoration: context.styles.cardDecoration,
+      child: Row(
         children: [
-          Icon(Icons.celebration_rounded, color: AppStyles.successColor),
-          SizedBox(width: 12),
-          Expanded(child: Text("Bütün işler bitti, eline sağlık!", style: AppStyles.listTileTitle)),
+          const Icon(Icons.celebration_rounded, color: AppStyles.successColor),
+          const SizedBox(width: 12),
+          Expanded(child: Text("Bütün işler bitti, eline sağlık!", style: context.styles.listTileTitle)),
         ],
       ),
     );
@@ -233,7 +233,7 @@ class _ChoresScreenState extends State<ChoresScreen> {
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        color: AppStyles.deleteColor,
+        color: context.styles.deleteColor,
         child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
       ),
       onDismissed: (_) => _delete(chore),
@@ -249,11 +249,11 @@ class _ChoresScreenState extends State<ChoresScreen> {
         onTap: () => _showChoreSheet(chore),
         contentPadding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
         leading: CircleAvatar(
-          backgroundColor: AppStyles.primarySoft,
-          foregroundColor: AppStyles.primaryColor,
+          backgroundColor: context.styles.primarySoft,
+          foregroundColor: context.styles.primaryColor,
           child: Text(name.characters.first.toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
-        title: Text(chore.name, style: AppStyles.listTileTitle),
+        title: Text(chore.name, style: context.styles.listTileTitle),
         subtitle: Text([name, if (chore.repeat != null) _repeatLabel(chore)].join(" · ")),
         trailing: IconButton(
           tooltip: "Tamamlandı",
@@ -272,16 +272,16 @@ class _ChoresScreenState extends State<ChoresScreen> {
         // Tekrarlı görev beklerken de düzenlenebilsin (ör. tekrarı kapatmak için)
         onTap: chore.repeat == null ? null : () => _showChoreSheet(chore),
         contentPadding: const EdgeInsets.fromLTRB(16, 2, 8, 2),
-        leading: const CircleAvatar(
-          backgroundColor: AppStyles.successSoft,
+        leading: CircleAvatar(
+          backgroundColor: context.styles.successSoft,
           foregroundColor: AppStyles.successColor,
-          child: Icon(Icons.check_rounded),
+          child: const Icon(Icons.check_rounded),
         ),
         title: Text(
           chore.name,
-          style: const TextStyle(
+          style: TextStyle(
             decoration: TextDecoration.lineThrough,
-            color: AppStyles.mutedTextColor,
+            color: context.styles.mutedTextColor,
           ),
         ),
         subtitle: Text([
@@ -290,7 +290,7 @@ class _ChoresScreenState extends State<ChoresScreen> {
         ].join(" · ")),
         trailing: IconButton(
           tooltip: "Sil",
-          icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
+          icon: Icon(Icons.close_rounded, size: 20, color: context.styles.mutedTextColor),
           onPressed: () => _delete(chore),
         ),
       ),
@@ -421,7 +421,7 @@ class _ChoreSheetState extends State<_ChoreSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(editing ? "Görevi düzenle" : "Yeni görev", style: AppStyles.popupHeader),
+          Text(editing ? "Görevi düzenle" : "Yeni görev", style: context.styles.popupHeader),
           const SizedBox(height: 16),
           TextField(
             controller: _nameController,
@@ -436,7 +436,7 @@ class _ChoreSheetState extends State<_ChoreSheet> {
             ),
           ),
           const SizedBox(height: 18),
-          const Text("Kime atansın?", style: AppStyles.listTileSubtitle),
+          Text("Kime atansın?", style: context.styles.listTileSubtitle),
           const SizedBox(height: 8),
           if (widget.members.isEmpty)
             OutlinedButton.icon(
@@ -464,7 +464,7 @@ class _ChoreSheetState extends State<_ChoreSheet> {
               onChanged: (id) => setState(() => _assignedId = id),
             ),
           const SizedBox(height: 18),
-          const Text("Ne sıklıkla?", style: AppStyles.listTileSubtitle),
+          Text("Ne sıklıkla?", style: context.styles.listTileSubtitle),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             // Menü null değeri "seçim yok" sayar; tek seferlik görev "none" ile gösterilir

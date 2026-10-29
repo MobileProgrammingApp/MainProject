@@ -5,7 +5,7 @@ import 'core/app_theme.dart';
 import 'core/session.dart';
 import 'features/splash/splash_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Yayın sürümünde log basılmasın (sunucu cevapları, hata detayları vb.
@@ -14,8 +14,10 @@ void main() {
     debugPrint = (String? message, {int? wrapWidth}) {};
   }
 
-  // Firebase, bildirimler ve oturum hazırlığı SplashScreen'de, açılış
-  // animasyonu oynarken yapılır; ilk kare beklemeden çizilir.
+  // Seçilen tema ilk kareden önce okunur, yoksa açılış bir an yanlış temayla
+  // çizilir. Firebase, bildirimler ve oturum hazırlığı SplashScreen'de,
+  // açılış animasyonu oynarken yapılır.
+  await AppTheme.loadMode();
   runApp(const MyApp());
 }
 
@@ -24,20 +26,29 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'HomePal',
-      debugShowCheckedModeBanner: false,
-      // Oturum düşünce (HTTP 401) her yerden giriş ekranına dönebilmek için
-      navigatorKey: Session.navigatorKey,
-      scaffoldMessengerKey: Session.messengerKey,
-      theme: AppTheme.light,
-      // Varsayılan: açık zemin üzerinde koyu durum çubuğu ikonları.
-      // Mavi başlık bandı (PageHeader) kendi bölgesinde bunu beyaza çevirir.
-      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
-        child: child!,
+    // Ayarlar'da tema değişince uygulama yeniden kurulmadan yeni temaya geçer
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppTheme.mode,
+      builder: (context, mode, _) => MaterialApp(
+        title: 'HomePal',
+        debugShowCheckedModeBanner: false,
+        // Oturum düşünce (HTTP 401) her yerden giriş ekranına dönebilmek için
+        navigatorKey: Session.navigatorKey,
+        scaffoldMessengerKey: Session.messengerKey,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        themeMode: mode,
+        // Varsayılan: açık temada koyu, koyu temada açık durum çubuğu ikonları.
+        // Mavi başlık bandı (PageHeader) kendi bölgesinde bunu beyaza çevirir.
+        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: (Theme.of(context).brightness == Brightness.dark
+                  ? SystemUiOverlayStyle.light
+                  : SystemUiOverlayStyle.dark)
+              .copyWith(statusBarColor: Colors.transparent),
+          child: child!,
+        ),
+        home: const SplashScreen(),
       ),
-      home: const SplashScreen(),
     );
   }
 }

@@ -109,16 +109,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: AppStyles.primarySoft, borderRadius: BorderRadius.circular(12)),
-            child: const Row(
+            decoration: BoxDecoration(color: context.styles.primarySoft, borderRadius: BorderRadius.circular(12)),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline_rounded, color: AppStyles.primaryColor, size: 20),
-                SizedBox(width: 10),
+                Icon(Icons.info_outline_rounded, color: context.styles.primaryColor, size: 20),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     "Evin ortak e-postası ve şifresiyle tüm aile üyeleri giriş yapar; herkes uygulamada kendi adını seçer.",
-                    style: TextStyle(color: AppStyles.textColor),
+                    style: TextStyle(color: context.styles.textColor),
                   ),
                 ),
               ],

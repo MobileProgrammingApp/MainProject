@@ -67,7 +67,7 @@ class _ManageHomeScreenState extends State<ManageHomeScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("İptal")),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppStyles.deleteColor),
+            style: TextButton.styleFrom(foregroundColor: context.styles.deleteColor),
             child: const Text("Sil"),
           ),
         ],
@@ -133,15 +133,15 @@ class _ManageHomeScreenState extends State<ManageHomeScreen> {
                             return ListTile(
                               contentPadding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
                               leading: CircleAvatar(
-                                backgroundColor: AppStyles.primarySoft,
-                                foregroundColor: AppStyles.primaryColor,
+                                backgroundColor: context.styles.primarySoft,
+                                foregroundColor: context.styles.primaryColor,
                                 child: Text(name.characters.first.toUpperCase(),
                                     style: const TextStyle(fontWeight: FontWeight.w700)),
                               ),
-                              title: Text(name, style: AppStyles.listTileTitle),
+                              title: Text(name, style: context.styles.listTileTitle),
                               trailing: IconButton(
                                 tooltip: "Sil",
-                                icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
+                                icon: Icon(Icons.close_rounded, size: 20, color: context.styles.mutedTextColor),
                                 onPressed: () => _delete(name, int.parse(member['id'].toString())),
                               ),
                             );
@@ -201,7 +201,7 @@ class _AddMemberSheetState extends State<_AddMemberSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text("Yeni kişi", style: AppStyles.popupHeader),
+          Text("Yeni kişi", style: context.styles.popupHeader),
           const SizedBox(height: 16),
           TextField(
             controller: _controller,

@@ -154,26 +154,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
           const SizedBox(height: 24),
+          const SectionHeader(title: "Görünüm"),
+          _buildThemeCard(),
+          const SizedBox(height: 24),
           const SectionHeader(title: "Hakkında"),
           GroupedCard(
             dividerIndent: 72,
             children: [
               ListTile(
                 contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
-                leading: _badge(Icons.privacy_tip_outlined, AppStyles.primaryColor, AppStyles.primarySoft),
-                title: const Text("Gizlilik politikası", style: AppStyles.listTileTitle),
-                trailing: const Icon(Icons.open_in_new_rounded, size: 20, color: AppStyles.mutedTextColor),
+                leading: _badge(Icons.privacy_tip_outlined, context.styles.primaryColor, context.styles.primarySoft),
+                title: Text("Gizlilik politikası", style: context.styles.listTileTitle),
+                trailing: Icon(Icons.open_in_new_rounded, size: 20, color: context.styles.mutedTextColor),
                 onTap: _openPrivacyPolicy,
               ),
               ListTile(
                 contentPadding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                leading: _badge(Icons.info_outline_rounded, AppStyles.primaryColor, AppStyles.primarySoft),
-                title: const Text("Sürüm", style: AppStyles.listTileTitle),
+                leading: _badge(Icons.info_outline_rounded, context.styles.primaryColor, context.styles.primarySoft),
+                title: Text("Sürüm", style: context.styles.listTileTitle),
                 trailing: FutureBuilder<PackageInfo>(
                   future: PackageInfo.fromPlatform(),
                   builder: (context, snapshot) => Text(
                     snapshot.hasData ? "${snapshot.data!.version} (${snapshot.data!.buildNumber})" : "",
-                    style: AppStyles.listTileSubtitle,
+                    style: context.styles.listTileSubtitle,
                   ),
                 ),
               ),
@@ -184,9 +187,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             clipBehavior: Clip.antiAlias,
             child: ListTile(
               contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
-              leading: _badge(Icons.logout_rounded, AppStyles.deleteColor, const Color(0xFFFBE6E6)),
-              title: const Text("Çıkış yap",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppStyles.deleteColor)),
+              leading: _badge(Icons.logout_rounded, context.styles.deleteColor, context.styles.deleteSoft),
+              title: Text("Çıkış yap",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: context.styles.deleteColor)),
               onTap: _confirmLogout,
             ),
           ),
@@ -219,10 +222,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _menuTile(IconData icon, String title, String subtitle, VoidCallback onTap) {
     return ListTile(
       contentPadding: const EdgeInsets.fromLTRB(16, 4, 12, 4),
-      leading: _badge(icon, AppStyles.primaryColor, AppStyles.primarySoft),
-      title: Text(title, style: AppStyles.listTileTitle),
+      leading: _badge(icon, context.styles.primaryColor, context.styles.primarySoft),
+      title: Text(title, style: context.styles.listTileTitle),
       subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right_rounded, color: AppStyles.mutedTextColor),
+      trailing: Icon(Icons.chevron_right_rounded, color: context.styles.mutedTextColor),
       onTap: onTap,
     );
   }
@@ -231,13 +234,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildMemberCard() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: AppStyles.cardDecoration,
+      decoration: context.styles.cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             "Bu cihazı kim kullanıyor? Görev bildirimleri ve anket oyları bu kişiye göre işlenir.",
-            style: AppStyles.listTileSubtitle,
+            style: context.styles.listTileSubtitle,
           ),
           const SizedBox(height: 14),
           if (isLoading)
@@ -246,10 +249,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Kişiler yüklenemedi: "önce kişi ekle" demek yanıltıcı olur
             Row(
               children: [
-                const Icon(Icons.cloud_off_rounded, color: AppStyles.mutedTextColor, size: 20),
+                Icon(Icons.cloud_off_rounded, color: context.styles.mutedTextColor, size: 20),
                 const SizedBox(width: 10),
-                const Expanded(
-                  child: Text("Kişiler yüklenemedi, internet bağlantını kontrol et.", style: AppStyles.listTileSubtitle),
+                Expanded(
+                  child: Text("Kişiler yüklenemedi, internet bağlantını kontrol et.", style: context.styles.listTileSubtitle),
                 ),
                 TextButton(
                   onPressed: () {
@@ -290,6 +293,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // Tema: telefonun ayarına uy, hep açık ya da hep koyu. Seçim bu cihazda saklanır.
+  Widget _buildThemeCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: context.styles.cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Telefonun ayarına uyarsa, gece modu açıldığında uygulama da koyulaşır.",
+            style: context.styles.listTileSubtitle,
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<ThemeMode>(
+            initialValue: AppTheme.mode.value,
+            isExpanded: true,
+            borderRadius: BorderRadius.circular(AppStyles.radius),
+            decoration: const InputDecoration(prefixIcon: Icon(Icons.dark_mode_outlined)),
+            items: const [
+              DropdownMenuItem(value: ThemeMode.system, child: Text("Telefonun ayarına uy")),
+              DropdownMenuItem(value: ThemeMode.light, child: Text("Açık")),
+              DropdownMenuItem(value: ThemeMode.dark, child: Text("Koyu")),
+            ],
+            onChanged: (mode) {
+              if (mode != null) AppTheme.setMode(mode);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _confirmLogout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -300,7 +335,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('İptal')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppStyles.deleteColor),
+            style: TextButton.styleFrom(foregroundColor: context.styles.deleteColor),
             child: const Text('Çıkış yap'),
           ),
         ],

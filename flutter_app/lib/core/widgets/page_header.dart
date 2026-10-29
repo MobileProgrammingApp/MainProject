@@ -40,13 +40,13 @@ class PageHeader extends StatelessWidget implements PreferredSizeWidget {
       // Mavi bant üzerinde durum çubuğu ikonları beyaz
       value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppStyles.primaryColor, Color(0xFF1D4ED8)],
+            colors: [context.styles.headerStart, context.styles.headerEnd],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.vertical(bottom: Radius.circular(24)),
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
         ),
         padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
         child: Column(
@@ -122,14 +122,14 @@ class SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.only(left: 4, bottom: 10),
       child: Row(
         children: [
-          Text(title, style: AppStyles.sectionTitle),
+          Text(title, style: context.styles.sectionTitle),
           if (count != null) ...[
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(color: AppStyles.primarySoft, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(color: context.styles.primarySoft, borderRadius: BorderRadius.circular(10)),
               child: Text("$count",
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppStyles.primaryColor)),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: context.styles.primaryColor)),
             ),
           ],
           const Spacer(),
@@ -146,17 +146,19 @@ class EmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
   final String message;
-  final Color color;
-  final Color softColor;
+  /// Verilmezse temanın ana rengi (mavi) kullanılır
+  final Color? color;
+  final Color? softColor;
+  final bool _muted;
 
   const EmptyState({
     super.key,
     required this.icon,
     required this.title,
     required this.message,
-    this.color = AppStyles.primaryColor,
-    this.softColor = AppStyles.primarySoft,
-  });
+    this.color,
+    this.softColor,
+  }) : _muted = false;
 
   /// Liste sunucuya ulaşılamadığı için boşsa: "liste boş" demek kullanıcıya
   /// verilerinin silindiğini düşündürür.
@@ -164,11 +166,13 @@ class EmptyState extends StatelessWidget {
       : icon = Icons.cloud_off_rounded,
         title = "Bağlantı kurulamadı",
         message = "İnternet bağlantını kontrol edip\naşağı çekerek yenile.",
-        color = AppStyles.mutedTextColor,
-        softColor = const Color(0xFFEDEFF3);
+        color = null,
+        softColor = null,
+        _muted = true;
 
   @override
   Widget build(BuildContext context) {
+    final s = context.styles;
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       children: [
@@ -177,14 +181,17 @@ class EmptyState extends StatelessWidget {
           child: Container(
             width: 96,
             height: 96,
-            decoration: BoxDecoration(color: softColor, shape: BoxShape.circle),
-            child: Icon(icon, size: 44, color: color),
+            decoration: BoxDecoration(
+              color: softColor ?? (_muted ? s.neutralSoft : s.primarySoft),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 44, color: color ?? (_muted ? s.mutedTextColor : s.primaryColor)),
           ),
         ),
         const SizedBox(height: 20),
-        Text(title, textAlign: TextAlign.center, style: AppStyles.listTileTitle),
+        Text(title, textAlign: TextAlign.center, style: s.listTileTitle),
         const SizedBox(height: 4),
-        Text(message, textAlign: TextAlign.center, style: AppStyles.listTileSubtitle),
+        Text(message, textAlign: TextAlign.center, style: s.listTileSubtitle),
       ],
     );
   }
@@ -226,7 +233,7 @@ class ListHint extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: AppStyles.listTileSubtitle.copyWith(fontSize: 12),
+        style: context.styles.listTileSubtitle.copyWith(fontSize: 12),
       ),
     );
   }

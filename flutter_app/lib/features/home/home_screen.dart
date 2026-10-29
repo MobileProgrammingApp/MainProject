@@ -230,8 +230,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Expanded(
                   child: _SummaryCard(
                     icon: Icons.task_alt_rounded,
-                    color: AppStyles.primaryColor,
-                    softColor: AppStyles.primarySoft,
+                    color: context.styles.primaryColor,
+                    softColor: context.styles.primarySoft,
                     count: pendingChoresCount,
                     label: "bekleyen iş",
                     unavailableLabel: "görevler alınamadı",
@@ -245,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   child: _SummaryCard(
                     icon: Icons.shopping_basket_rounded,
                     color: AppStyles.accentColor,
-                    softColor: AppStyles.accentSoft,
+                    softColor: context.styles.accentSoft,
                     count: pendingShoppingCount,
                     label: "alınacak ürün",
                     unavailableLabel: "liste alınamadı",
@@ -279,7 +279,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: CircleAvatar(
           radius: 22,
           backgroundColor: Colors.white,
-          foregroundColor: AppStyles.primaryColor,
+          foregroundColor: context.styles.primaryColor,
           child: initial.isEmpty
               ? const Icon(Icons.person_rounded)
               : Text(initial.characters.first.toUpperCase(),
@@ -292,7 +292,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // Görev atama, bildirim ve oylama için cihazın hangi üyeye ait olduğu gerekli
   Widget _buildMemberPrompt() {
     return Material(
-      color: AppStyles.primaryColor,
+      // Başlık bandının mavisi: koyu temada da beyaz yazı okunur kalsın
+      color: context.styles.headerStart,
       borderRadius: BorderRadius.circular(AppStyles.radius),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -327,7 +328,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (isLoading && !_pollLoaded) {
       return Container(
         height: 88,
-        decoration: AppStyles.cardDecoration,
+        decoration: context.styles.cardDecoration,
         alignment: Alignment.center,
         child: const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5)),
       );
@@ -337,23 +338,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!_pollLoaded) {
       return Container(
         padding: const EdgeInsets.all(20),
-        decoration: AppStyles.cardDecoration,
+        decoration: context.styles.cardDecoration,
         child: Row(
           children: [
             Container(
               width: 48,
               height: 48,
-              decoration: BoxDecoration(color: const Color(0xFFEDEFF3), borderRadius: BorderRadius.circular(14)),
-              child: const Icon(Icons.cloud_off_rounded, color: AppStyles.mutedTextColor),
+              decoration: BoxDecoration(color: context.styles.neutralSoft, borderRadius: BorderRadius.circular(14)),
+              child: Icon(Icons.cloud_off_rounded, color: context.styles.mutedTextColor),
             ),
             const SizedBox(width: 16),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Anket bilgisi alınamadı", style: AppStyles.listTileTitle),
-                  SizedBox(height: 2),
-                  Text("Bağlantı gelince kendiliğinden yenilenir.", style: AppStyles.listTileSubtitle),
+                  Text("Anket bilgisi alınamadı", style: context.styles.listTileTitle),
+                  const SizedBox(height: 2),
+                  Text("Bağlantı gelince kendiliğinden yenilenir.", style: context.styles.listTileSubtitle),
                 ],
               ),
             ),
@@ -371,23 +372,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!hasActivePoll) {
       return Container(
         padding: const EdgeInsets.all(20),
-        decoration: AppStyles.cardDecoration,
+        decoration: context.styles.cardDecoration,
         child: Row(
           children: [
             Container(
               width: 48,
               height: 48,
-              decoration: BoxDecoration(color: AppStyles.accentSoft, borderRadius: BorderRadius.circular(14)),
+              decoration: BoxDecoration(color: context.styles.accentSoft, borderRadius: BorderRadius.circular(14)),
               child: const Icon(Icons.how_to_vote_rounded, color: AppStyles.accentColor),
             ),
             const SizedBox(width: 16),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Aktif anket yok", style: AppStyles.listTileTitle),
-                  SizedBox(height: 2),
-                  Text("Ortak kararları oylamayla verin.", style: AppStyles.listTileSubtitle),
+                  Text("Aktif anket yok", style: context.styles.listTileTitle),
+                  const SizedBox(height: 2),
+                  Text("Ortak kararları oylamayla verin.", style: context.styles.listTileSubtitle),
                 ],
               ),
             ),
@@ -423,7 +424,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: AppStyles.cardDecoration,
+      decoration: context.styles.cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -431,24 +432,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             children: [
               Expanded(
                 child: Text(pollQuestion,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppStyles.textColor)),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: context.styles.textColor)),
               ),
               if (!pollIsOpen)
-                _pollBadge("Bitti", AppStyles.mutedTextColor, const Color(0xFFEDEFF3))
+                _pollBadge("Bitti", context.styles.mutedTextColor, context.styles.neutralSoft)
               else if (hasVoted)
-                _pollBadge("Oy verildi", AppStyles.successColor, AppStyles.successSoft),
+                _pollBadge("Oy verildi", AppStyles.successColor, context.styles.successSoft),
             ],
           ),
           const SizedBox(height: 4),
           Text(
             [if (pollCreatedBy != null) "$pollCreatedBy sordu", pollIsOpen ? _timeLeft : "Anket sona erdi"].join(" • "),
-            style: AppStyles.listTileSubtitle,
+            style: context.styles.listTileSubtitle,
           ),
           const SizedBox(height: 16),
           for (var i = 0; i < pollOptions.length; i++) optionBar(i),
           const SizedBox(height: 2),
           // Herkesin tek oyu olduğu için toplam oy, oy veren kişi sayısıdır
-          Text(_pollHint(totalVotes), style: AppStyles.listTileSubtitle),
+          Text(_pollHint(totalVotes), style: context.styles.listTileSubtitle),
           if (!pollIsOpen)
             Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -519,7 +520,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           ListTile(
             leading: const Icon(Icons.people_alt_rounded),
-            title: const Text("Ev üyeleri", style: AppStyles.listTileTitle),
+            title: Text("Ev üyeleri", style: context.styles.listTileTitle),
             subtitle: const Text("Üye ekle veya çıkar"),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ManageHomeScreen())),
@@ -527,7 +528,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           const Divider(indent: 16, endIndent: 16),
           ListTile(
             leading: const Icon(Icons.info_rounded),
-            title: const Text("Ev bilgileri", style: AppStyles.listTileTitle),
+            title: Text("Ev bilgileri", style: context.styles.listTileTitle),
             subtitle: const Text("Wi-Fi, kapı kodu, eşyaların yeri"),
             trailing: const Icon(Icons.chevron_right_rounded),
             onTap: () => widget.onTabChange(3),
@@ -592,10 +593,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Text("Yeni anket", style: AppStyles.popupHeader),
+                Text("Yeni anket", style: context.styles.popupHeader),
                 const SizedBox(height: 4),
-                const Text("Evdeki herkese bildirim gider; istediğin zaman bitirebilirsin.",
-                    style: AppStyles.listTileSubtitle),
+                Text("Evdeki herkese bildirim gider; istediğin zaman bitirebilirsin.",
+                    style: context.styles.listTileSubtitle),
                 const SizedBox(height: 16),
                 TextField(
                   controller: questionCtrl,
@@ -628,7 +629,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ),
                 const SizedBox(height: 10),
-                const Text("Ne kadar açık kalsın?", style: AppStyles.listTileSubtitle),
+                Text("Ne kadar açık kalsın?", style: context.styles.listTileSubtitle),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<int>(
                   initialValue: durationHours,
@@ -712,15 +713,15 @@ class _SummaryCard extends StatelessWidget {
                     child: Icon(icon, color: color, size: 22),
                   ),
                   const Spacer(),
-                  const Icon(Icons.arrow_forward_rounded, size: 18, color: AppStyles.mutedTextColor),
+                  Icon(Icons.arrow_forward_rounded, size: 18, color: context.styles.mutedTextColor),
                 ],
               ),
               const SizedBox(height: 14),
               Text(
                 isLoading || unavailable ? "–" : "$count",
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppStyles.textColor),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: context.styles.textColor),
               ),
-              Text(!isLoading && unavailable ? unavailableLabel : label, style: AppStyles.listTileSubtitle),
+              Text(!isLoading && unavailable ? unavailableLabel : label, style: context.styles.listTileSubtitle),
             ],
           ),
         ),
@@ -750,11 +751,11 @@ class _PollOptionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fill = isMyChoice ? AppStyles.primaryColor.withValues(alpha: 0.22) : AppStyles.primaryColor.withValues(alpha: 0.10);
+    final fill = context.styles.primaryColor.withValues(alpha: isMyChoice ? 0.22 : 0.10);
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: const Color(0xFFF1F4F9),
+        color: context.styles.trackColor,
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -779,7 +780,7 @@ class _PollOptionBar extends StatelessWidget {
                       const SizedBox(width: 8),
                     ],
                     if (isMyChoice) ...[
-                      const Icon(Icons.check_circle_rounded, size: 18, color: AppStyles.primaryColor),
+                      Icon(Icons.check_circle_rounded, size: 18, color: context.styles.primaryColor),
                       const SizedBox(width: 8),
                     ],
                     Expanded(
@@ -787,13 +788,13 @@ class _PollOptionBar extends StatelessWidget {
                         text,
                         style: TextStyle(
                           fontWeight: isMyChoice || isWinner ? FontWeight.w700 : FontWeight.w500,
-                          color: AppStyles.textColor,
+                          color: context.styles.textColor,
                         ),
                       ),
                     ),
                     if (showResult)
                       Text("%${(percent * 100).round()}",
-                          style: const TextStyle(fontWeight: FontWeight.w700, color: AppStyles.textColor)),
+                          style: TextStyle(fontWeight: FontWeight.w700, color: context.styles.textColor)),
                   ],
                 ),
               ),

@@ -29,10 +29,10 @@ class HomePalWordmark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text.rich(
-      const TextSpan(
+      TextSpan(
         children: [
-          TextSpan(text: "Home", style: TextStyle(color: AppStyles.primaryColor)),
-          TextSpan(text: "Pal", style: TextStyle(color: AppStyles.accentColor)),
+          TextSpan(text: "Home", style: TextStyle(color: context.styles.primaryColor)),
+          const TextSpan(text: "Pal", style: TextStyle(color: AppStyles.accentColor)),
         ],
       ),
       style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w800, letterSpacing: -0.5),
@@ -96,7 +96,7 @@ class _MarkPainter extends CustomPainter {
         ..lineTo(120, 62)
         ..lineTo(180, 110),
       Paint()
-        ..color = AppStyles.primaryColor
+        ..color = AppStyles.brandBlue
         ..style = PaintingStyle.stroke
         ..strokeWidth = 18
         ..strokeCap = StrokeCap.round
@@ -110,7 +110,7 @@ class _MarkPainter extends CustomPainter {
       ..arcToPoint(const Offset(131, 160), radius: const Radius.circular(11))
       ..lineTo(131, 174)
       ..close();
-    canvas.drawPath(door, Paint()..color = AppStyles.primaryColor);
+    canvas.drawPath(door, Paint()..color = AppStyles.brandBlue);
 
     // Yanaklar
     final cheek = Paint()..color = const Color(0xFFE8590C).withValues(alpha: 0.35);
@@ -128,7 +128,7 @@ class _MarkPainter extends CustomPainter {
         ..moveTo(106, 135)
         ..quadraticBezierTo(120, 147, 134, 135),
       Paint()
-        ..color = AppStyles.textColor
+        ..color = AppStyles.brandNavy
         ..style = PaintingStyle.stroke
         ..strokeWidth = 5
         ..strokeCap = StrokeCap.round,

@@ -50,7 +50,7 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                     contentPadding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
                     value: _enabled!,
                     onChanged: _update,
-                    title: const Text('Bu cihaza bildirim gönder', style: AppStyles.listTileTitle),
+                    title: Text('Bu cihaza bildirim gönder', style: context.styles.listTileTitle),
                     subtitle: const Padding(
                       padding: EdgeInsets.only(top: 4),
                       child: Text("Sana görev atandığında, bir görev tamamlandığında, market listesine "
@@ -59,11 +59,11 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
                   ),
                 ),
                 const SizedBox(height: 12),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     "Bildirimler Ayarlar > \"Ben kimim?\" bölümünde seçili kişiye gelir.",
-                    style: AppStyles.listTileSubtitle,
+                    style: context.styles.listTileSubtitle,
                   ),
                 ),
               ],

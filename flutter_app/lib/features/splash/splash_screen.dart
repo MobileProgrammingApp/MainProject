@@ -122,7 +122,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppStyles.backgroundColor,
+      backgroundColor: context.styles.backgroundColor,
       body: AnimatedBuilder(
         animation: Listenable.merge([_intro, _blink]),
         builder: (context, _) {
@@ -151,9 +151,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 offset: Offset(0, 80 + 10 * (1 - _tagline.value)),
                 child: Opacity(
                   opacity: _tagline.value,
-                  child: const BrandHero(
+                  child: BrandHero(
                     tag: BrandHero.tagline,
-                    child: Text("Evin ortak asistanı", style: AppStyles.listTileSubtitle),
+                    child: Text("Evin ortak asistanı", style: context.styles.listTileSubtitle),
                   ),
                 ),
               ),

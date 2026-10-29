@@ -136,6 +136,9 @@ class _OfflineBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Snackbar gibi: açık temada lacivert üstünde beyaz, koyu temada açık zemin üstünde koyu yazı
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final foreground = isDark ? context.styles.backgroundColor : Colors.white;
     return ValueListenableBuilder<bool>(
       valueListenable: ApiService.offline,
       builder: (context, offline, _) => AnimatedSize(
@@ -144,19 +147,19 @@ class _OfflineBar extends StatelessWidget {
             ? const SizedBox(width: double.infinity)
             : Container(
                 width: double.infinity,
-                color: AppStyles.textColor,
+                color: context.styles.textColor,
                 padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
                 child: Row(
                   children: [
-                    const Icon(Icons.cloud_off_rounded, color: Colors.white, size: 18),
+                    Icon(Icons.cloud_off_rounded, color: foreground, size: 18),
                     const SizedBox(width: 10),
-                    const Expanded(
+                    Expanded(
                       child: Text("İnternet bağlantısı yok",
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                          style: TextStyle(color: foreground, fontWeight: FontWeight.w600)),
                     ),
                     TextButton(
                       onPressed: onRetry,
-                      style: TextButton.styleFrom(foregroundColor: Colors.white),
+                      style: TextButton.styleFrom(foregroundColor: foreground),
                       child: const Text("Tekrar dene"),
                     ),
                   ],

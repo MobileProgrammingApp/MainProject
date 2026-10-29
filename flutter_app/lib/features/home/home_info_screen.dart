@@ -85,7 +85,7 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('İptal')),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppStyles.deleteColor),
+            style: TextButton.styleFrom(foregroundColor: context.styles.deleteColor),
             child: const Text('Sil'),
           ),
         ],
@@ -194,9 +194,9 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
             final hidden = _isSecret(info['title'].toString()) && !_revealed.contains(id);
             return ListTile(
               contentPadding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
-              leading: _iconBadge(_iconForTitle(info['title'].toString()), AppStyles.primaryColor, AppStyles.primarySoft),
-              title: Text(info['title'].toString(), style: AppStyles.listTileSubtitle),
-              subtitle: Text(hidden ? "••••••••" : value, style: AppStyles.listTileTitle),
+              leading: _iconBadge(_iconForTitle(info['title'].toString()), context.styles.primaryColor, context.styles.primarySoft),
+              title: Text(info['title'].toString(), style: context.styles.listTileSubtitle),
+              subtitle: Text(hidden ? "••••••••" : value, style: context.styles.listTileTitle),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -204,12 +204,12 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
                     IconButton(
                       tooltip: hidden ? "Göster" : "Gizle",
                       icon: Icon(hidden ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                          size: 20, color: AppStyles.primaryColor),
+                          size: 20, color: context.styles.primaryColor),
                       onPressed: () => setState(() => hidden ? _revealed.add(id) : _revealed.remove(id)),
                     ),
                   IconButton(
                     tooltip: "Kopyala",
-                    icon: const Icon(Icons.copy_rounded, size: 20, color: AppStyles.primaryColor),
+                    icon: Icon(Icons.copy_rounded, size: 20, color: context.styles.primaryColor),
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: value));
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -219,7 +219,7 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
                   ),
                   IconButton(
                     tooltip: "Sil",
-                    icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
+                    icon: Icon(Icons.close_rounded, size: 20, color: context.styles.mutedTextColor),
                     onPressed: () => _delete(id, true),
                   ),
                 ],
@@ -234,12 +234,12 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
   Widget _buildInventoryList() {
     if (_inventory.isEmpty && ApiService.offline.value) return const EmptyState.offline();
     if (_inventory.isEmpty) {
-      return const EmptyState(
+      return EmptyState(
         icon: Icons.inventory_2_outlined,
         title: "Henüz eşya yok",
         message: "Pasaportlar, yedek anahtar, faturalar…\nNerede olduklarını unutmamak için ekle.",
         color: AppStyles.accentColor,
-        softColor: AppStyles.accentSoft,
+        softColor: context.styles.accentSoft,
       );
     }
     return ListView(
@@ -250,18 +250,18 @@ class _HomeInfoScreenState extends State<HomeInfoScreen> with SingleTickerProvid
           children: _inventory.map((item) {
             return ListTile(
               contentPadding: const EdgeInsets.fromLTRB(16, 6, 4, 6),
-              leading: _iconBadge(Icons.inventory_2_rounded, AppStyles.accentColor, AppStyles.accentSoft),
-              title: Text(item['item_name'].toString(), style: AppStyles.listTileTitle),
+              leading: _iconBadge(Icons.inventory_2_rounded, AppStyles.accentColor, context.styles.accentSoft),
+              title: Text(item['item_name'].toString(), style: context.styles.listTileTitle),
               subtitle: Row(
                 children: [
-                  const Icon(Icons.place_outlined, size: 15, color: AppStyles.mutedTextColor),
+                  Icon(Icons.place_outlined, size: 15, color: context.styles.mutedTextColor),
                   const SizedBox(width: 4),
                   Expanded(child: Text(item['location'].toString())),
                 ],
               ),
               trailing: IconButton(
                 tooltip: "Sil",
-                icon: const Icon(Icons.close_rounded, size: 20, color: AppStyles.mutedTextColor),
+                icon: Icon(Icons.close_rounded, size: 20, color: context.styles.mutedTextColor),
                 onPressed: () => _delete(int.parse(item['id'].toString()), false),
               ),
             );
@@ -361,7 +361,7 @@ class _AddEntrySheetState extends State<_AddEntrySheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(widget.title, style: AppStyles.popupHeader),
+          Text(widget.title, style: context.styles.popupHeader),
           const SizedBox(height: 16),
           TextField(
             controller: _first,

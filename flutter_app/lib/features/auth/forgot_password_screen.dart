@@ -64,9 +64,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   List<Widget> _buildForm() {
     return [
-      const Text(
+      Text(
         "Ev hesabına kayıtlı e-posta adresini gir, şifreni yenilemen için bir bağlantı gönderelim.",
-        style: TextStyle(color: AppStyles.textColor, fontSize: 15),
+        style: TextStyle(color: context.styles.textColor, fontSize: 15),
       ),
       const SizedBox(height: 20),
       TextField(
@@ -94,17 +94,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         child: Container(
           width: 96,
           height: 96,
-          decoration: const BoxDecoration(color: AppStyles.successSoft, shape: BoxShape.circle),
+          decoration: BoxDecoration(color: context.styles.successSoft, shape: BoxShape.circle),
           child: const Icon(Icons.mark_email_read_outlined, size: 44, color: AppStyles.successColor),
         ),
       ),
       const SizedBox(height: 20),
-      const Text("E-postanı kontrol et", textAlign: TextAlign.center, style: AppStyles.listTileTitle),
+      Text("E-postanı kontrol et", textAlign: TextAlign.center, style: context.styles.listTileTitle),
       const SizedBox(height: 6),
-      const Text(
+      Text(
         "Adres kayıtlıysa şifre sıfırlama bağlantısını gönderdik. Birkaç dakika içinde gelmezse spam klasörüne de bak.",
         textAlign: TextAlign.center,
-        style: AppStyles.listTileSubtitle,
+        style: context.styles.listTileSubtitle,
       ),
       const SizedBox(height: 28),
       FilledButton(

@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Uygulamanın karanlık teması yok; gece modunda da açık renkli açılış ekranı
-     kullanılır (aksi halde açılışta siyahtan açık renge geçiş olur). -->
+<!-- Gece modu açıkken: koyu açılış ekranı (renk values-night/colors.xml'de),
+     uygulamanın koyu temasıyla aynı zemin. -->
 <resources>
     <!-- Flutter ilk kareyi çizene kadar gösterilen açılış ekranı -->
-    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>
     </style>
     <!-- Flutter arayüzünün arkasındaki pencere rengi -->
-    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">@color/splash_background</item>
     </style>
 </resources>

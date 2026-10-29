@@ -82,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppStyles.backgroundColor,
+      backgroundColor: context.styles.backgroundColor,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(30.0),
@@ -93,9 +93,9 @@ class _LoginScreenState extends State<LoginScreen> {
               const BrandHero(tag: BrandHero.mark, child: HomePalMark(size: kBrandMarkSize)),
               const BrandHero(tag: BrandHero.wordmark, child: HomePalWordmark()),
               const SizedBox(height: 6),
-              const BrandHero(
+              BrandHero(
                 tag: BrandHero.tagline,
-                child: Text("Evin ortak asistanı", style: AppStyles.listTileSubtitle),
+                child: Text("Evin ortak asistanı", style: context.styles.listTileSubtitle),
               ),
               const SizedBox(height: 36),
 
@@ -158,12 +158,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     builder: (context) => const RegisterScreen(),
                   ),
                 ),
-                child: const Text.rich(
+                child: Text.rich(
                   TextSpan(
                     text: "Henüz bir ev hesabın yok mu? ",
-                    style: TextStyle(color: AppStyles.mutedTextColor),
+                    style: TextStyle(color: context.styles.mutedTextColor),
                     children: [
-                      TextSpan(text: "Yeni ev oluştur", style: TextStyle(color: AppStyles.primaryColor, fontWeight: FontWeight.w700)),
+                      TextSpan(text: "Yeni ev oluştur", style: TextStyle(color: context.styles.primaryColor, fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),

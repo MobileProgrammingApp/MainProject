@@ -8,6 +8,7 @@ Flutter mobil uygulaması (ev/ev arkadaşları için görev, market listesi, ev 
 - `backend/schema.sql` — Veri içermeyen, güncel veritabanı şeması (fresh kurulum için).
 - `backend/tests/` — Uçtan uca API testleri: `python backend/tests/run_tests.py` (izole MariaDB + PHP kurar, gerçek veritabanına dokunmaz). Backend değişikliğinden sonra deploy öncesi çalıştırın; yeni endpoint'e test ekleyin.
 - Hesap silme uygulama içinden (`delete_account.php`, şifre onaylı; bağlı tablolar `ON DELETE CASCADE` ile silinir) ve web'den (`delete-account.html`) yapılabilir; Google Play bunu şart koşuyor.
+- Açık ve koyu tema var (1.3.0+): Ayarlar > Görünüm'den "Telefonun ayarına uy / Açık / Koyu" seçilir, SharedPreferences `theme_mode`'da durur ve çıkış yapınca silinmez. Temaya göre değişen renk/stiller `lib/core/app_theme.dart`'taki `AppStyles.light`/`AppStyles.dark` içinde, ekranlarda `context.styles.textColor` gibi okunur. İki temada aynı kalanlar statik: `AppStyles.accentColor`, `successColor`, amblem için `brandBlue`/`brandNavy`. Ekrana sabit renk (`Colors.white`, `Color(0x…)`) yazmayın; koyu temada okunmaz. Telefon gece modundayken yerel açılış ekranı da koyudur (`res/values-night/colors.xml`); rengi `AppStyles.dark.backgroundColor` ile aynı tutun.
 
 ## Sunucu / Deploy
 - Sunucu: IONOS VPS (Ubuntu), Nginx + PHP-FPM + MariaDB.

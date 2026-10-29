@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Uygulamanın karanlık teması yok; gece modunda da açık renkli açılış ekranı
-     kullanılır (aksi halde açılışta siyahtan açık renge geçiş olur). -->
+<!-- Gece modu kapalıyken (gece modu için values-night). Uygulama varsayılan olarak
+     telefonun ayarına uyar; açılış ekranı da ona göre açık ya da koyu olur. -->
 <resources>
     <!-- Flutter ilk kareyi çizene kadar gösterilen açılış ekranı -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
