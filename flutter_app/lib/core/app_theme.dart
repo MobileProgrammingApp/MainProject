@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ==========================================
@@ -220,15 +222,31 @@ class AppTheme {
   /// MaterialApp bunu dinler. Varsayılan: telefonun ayarına uy.
   static final mode = ValueNotifier<ThemeMode>(ThemeMode.system);
 
+  // Seçim Android'e de bildirilir: Android 12+ açılış ekranı uygulamanın temasıyla
+  // çizilsin (bkz. MainActivity.kt). Diğer platformlarda karşılığı yok, hata yutulur.
+  static const _platform = MethodChannel('homepal/theme');
+
   static Future<void> loadMode() async {
     final prefs = await SharedPreferences.getInstance();
     mode.value = ThemeMode.values.asNameMap()[prefs.getString(modeKey)] ?? ThemeMode.system;
+    // Her açılışta eşitlenir: uygulama verisi silinse de sistemdeki seçim eski kalmasın.
+    // Beklenmez, ilk kare gecikmesin.
+    unawaited(_applyToPlatform(mode.value));
   }
 
   static Future<void> setMode(ThemeMode value) async {
     mode.value = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(modeKey, value.name);
+    await _applyToPlatform(value);
+  }
+
+  static Future<void> _applyToPlatform(ThemeMode value) async {
+    try {
+      await _platform.invokeMethod('setNightMode', value.name);
+    } catch (e) {
+      debugPrint("Tema sisteme bildirilemedi: $e");
+    }
   }
 
   static ThemeData get light => _build(

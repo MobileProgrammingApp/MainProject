@@ -8,7 +8,7 @@ Flutter mobil uygulaması (ev/ev arkadaşları için görev, market listesi, ev 
 - `backend/schema.sql` — Veri içermeyen, güncel veritabanı şeması (fresh kurulum için).
 - `backend/tests/` — Uçtan uca API testleri: `python backend/tests/run_tests.py` (izole MariaDB + PHP kurar, gerçek veritabanına dokunmaz). Backend değişikliğinden sonra deploy öncesi çalıştırın; yeni endpoint'e test ekleyin.
 - Hesap silme uygulama içinden (`delete_account.php`, şifre onaylı; bağlı tablolar `ON DELETE CASCADE` ile silinir) ve web'den (`delete-account.html`) yapılabilir; Google Play bunu şart koşuyor.
-- Açık ve koyu tema var (1.3.0+): Ayarlar > Görünüm'den "Telefonun ayarına uy / Açık / Koyu" seçilir, SharedPreferences `theme_mode`'da durur ve çıkış yapınca silinmez. Temaya göre değişen renk/stiller `lib/core/app_theme.dart`'taki `AppStyles.light`/`AppStyles.dark` içinde, ekranlarda `context.styles.textColor` gibi okunur. İki temada aynı kalanlar statik: `AppStyles.accentColor`, `successColor`, amblem için `brandBlue`/`brandNavy`. Ekrana sabit renk (`Colors.white`, `Color(0x…)`) yazmayın; koyu temada okunmaz. Telefon gece modundayken yerel açılış ekranı da koyudur (`res/values-night/colors.xml`); rengi `AppStyles.dark.backgroundColor` ile aynı tutun.
+- Açık ve koyu tema var (1.3.0+): Ayarlar > Görünüm'den "Telefonun ayarına uy / Açık / Koyu" seçilir, SharedPreferences `theme_mode`'da durur ve çıkış yapınca silinmez. Temaya göre değişen renk/stiller `lib/core/app_theme.dart`'taki `AppStyles.light`/`AppStyles.dark` içinde, ekranlarda `context.styles.textColor` gibi okunur. İki temada aynı kalanlar statik: `AppStyles.accentColor`, `successColor`, amblem için `brandBlue`/`brandNavy`. Ekrana sabit renk (`Colors.white`, `Color(0x…)`) yazmayın; koyu temada okunmaz. Telefon gece modundayken yerel açılış ekranı da koyudur (`res/values-night/colors.xml`); rengi `AppStyles.dark.backgroundColor` ile aynı tutun. Seçim `MainActivity.kt`'deki `homepal/theme` kanalıyla `UiModeManager.setApplicationNightMode`'a da verilir; Android 12+'da açılış ekranı telefondan farklı seçilen temayla açılır (Android 11 ve öncesinde telefonun temasıyla).
 
 ## Sunucu / Deploy
 - Sunucu: IONOS VPS (Ubuntu), Nginx + PHP-FPM + MariaDB.
@@ -39,6 +39,7 @@ Flutter mobil uygulaması (ev/ev arkadaşları için görev, market listesi, ev 
 - Firebase projesi: `homepal-app-d0cb6` (geliştiricinin kendi hesabında, önceki bir arkadaşının projesinden bağımsız).
 - `backend/api/fcm_helper.php` — FCM v1 API ile bildirim gönderme (görev atama/tamamlama, yeni anket, anket sonucu, market listesine ürün ekleme). Endpoint'ler `notifyMembers()` ile, alıcıları `memberTokens()`/`houseTokens()` ile bulur; Google `NOT_FOUND`/`UNREGISTERED` derse token DB'den silinir, hatalar `error_log`'a yazılır. Testlerde `.env`'deki `FCM_TEST_LOG` bildirimi göndermek yerine alıcıları dosyaya yazar.
 - Cihazlar `member_devices` tablosunda (1.3.0+): bir üyenin birden fazla cihazı olabilir, bildirim hepsine gider; token benzersiz olduğu için bir cihaz tek üyeye bağlıdır ("Ben kimim?" değişince `update_member_token.php` onu yeni üyeye taşır). Bildirimi kapatan ya da çıkış yapan cihaz `enabled=0` ile sadece kendi kaydını siler; 1.2.0 ve öncesi boş token gönderir, o zaman üyenin bütün cihazları silinir (açık olanlar uygulama açılınca kendini yeniden kaydeder).
+- Uygulama hâlâ `getToken()`/`onTokenRefresh` kullanıyor (firebase_messaging 17'de eskidi). Önerilen `register()`/`onRegistered` FCM token'ı yerine Firebase Installation ID verir; ona geçmek için sunucunun gönderimi de değişmeli.
 - Firebase servis hesabı JSON anahtarı sunucuda **web kökünün dışında**: `/etc/homepal/fcm-service-account.json` (`root:www-data`, `640`), `.env`'de `KEY_FILEPATH`. Eskiden `backend/api/keys/` altındaydı ve web'den indirilebiliyordu; 2026-10-23'te o anahtar iptal edilip yenisi oluşturuldu.
 
 ## Çökme raporları (Crashlytics)
@@ -49,7 +50,7 @@ Flutter mobil uygulaması (ev/ev arkadaşları için görev, market listesi, ev 
 
 ## Android derleme
 - Gradle 9.3.1, AGP 9.1.0, Kotlin 2.4.0, Java 17. Bunlar Flutter 3.47'nin yeni proje şablonuyla aynı. `gradle.properties`'te `android.builtInKotlin=false` ve `android.newDsl=false`, eklentiler AGP 9'un yeni yollarına geçene kadar kalmalı. Kotlin eklentisini app modülüne Flutter eklentisi uygular; `app/build.gradle.kts`'e `kotlin-android` eklemeyin.
-- Derlemede "plugins that apply KGP" uyarısı çıkıyor (firebase_core, firebase_crashlytics). Şimdilik derlemeye engel değil. Çözüm FlutterFire'ın yeni ana sürümüne (core 5 / crashlytics 6 / messaging 17) geçmek olabilir. Geçerken bildirimleri (ön plan, arka plan, dokunma) tekrar test edin.
+- FlutterFire: firebase_core 5, firebase_crashlytics 6, firebase_messaging 17 (Firebase Android BoM 35, minSdk 24). Derlemede "plugins that apply KGP" uyarısı (firebase_core, firebase_crashlytics) bu en son sürümlerde de çıkıyor; şimdilik derlemeye engel değil, eklentiler güncellenince gider.
 
 ## Play Store
 - Paket adı: `com.swordarchitecture.homepal` (değiştirilemez, kalıcı).

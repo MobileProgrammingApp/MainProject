@@ -58,6 +58,10 @@ class NotificationService {
     final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) _open(initialMessage.data['screen']);
 
+    // firebase_messaging 17 bunun yerine register()/onRegistered öneriyor, ama o
+    // FCM token'ı değil Firebase Installation ID veriyor ve sunucunun başka bir
+    // gönderim yöntemine geçmesini gerektiriyor (fcm_helper.php "token" ile gönderir).
+    // ignore: deprecated_member_use
     FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
       if (await _isEnabled()) {
         await _registerToken(token);
@@ -114,6 +118,7 @@ class NotificationService {
   /// servisleri yok) null.
   static Future<String?> deviceToken() async {
     try {
+      // ignore: deprecated_member_use (bkz. onTokenRefresh notu)
       return await FirebaseMessaging.instance.getToken();
     } catch (e) {
       debugPrint("FCM token alınamadı: $e");
